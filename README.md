@@ -32,6 +32,22 @@ This project implements and extends the link prediction algorithm for signed net
 2. Improve the original algorithm by incorporating edge weight information
 3. Extend the algorithm to predict both sign and weight of edges
 
+## Key Results (Part 1)
+
+### Performance Metrics (10-fold Cross-validation)
+| k | Accuracy | AUC | False Positive Rate | Precision | Recall | F1 Score |
+|---|----------|-----|---------------------|-----------|--------|----------|
+| 3 | 92.75% ± 0.33% | 0.8514 ± 0.0123 | 65.32% ± 2.52% | 93.18% ± 0.43% | 99.20% ± 0.18% | 96.10% ± 0.19% |
+| 4 | 97.10% ± 0.20% | 0.9669 ± 0.0104 | 26.28% ± 1.84% | 97.15% ± 0.24% | 99.69% ± 0.11% | 98.41% ± 0.12% |
+
+### Key Improvements (k=3 → k=4)
+- Accuracy: +4.69%
+- AUC: +13.56%
+- False Positive Rate: -59.77% (major reduction)
+- Precision: +4.26%
+- Recall: +0.49%
+- F1 Score: +2.40%
+
 ## How to Run
 ```bash
 # Install dependencies

@@ -11,12 +11,8 @@ Thumbs.db
 # Ignore VSCode settings (optional)
 .vscode/
 
-<<<<<<< HEAD
-# ignore output data
-results/
+# Temporarily allow results folder for report writing
+# results/  # Commented out so team can access evaluation results
 
 # Ignore pycache files
 __pycache__/
-=======
-__pycache__/
->>>>>>> 039c20d (Added my implementation)
