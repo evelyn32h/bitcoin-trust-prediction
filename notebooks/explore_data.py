@@ -10,7 +10,7 @@ sys.path.append(os.path.join('..'))
 
 # Import custom modules
 from src.data_loader import load_bitcoin_data
-from src.preprocessing import convert_to_signed_graph, ensure_connectivity
+from src.preprocessing import map_to_unweighted_graph, ensure_connectivity
 
 def analyze_network(G):
     """
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     
     # Create signed graph and analyze
     print("\nCreating signed graph...")
-    G_signed = convert_to_signed_graph(G)
+    G_signed = map_to_unweighted_graph(G)
     print("\nSigned Graph Statistics:")
     signed_stats = analyze_network(G_signed)
     for key, value in signed_stats.items():

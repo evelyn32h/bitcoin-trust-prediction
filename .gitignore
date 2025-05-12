@@ -10,3 +10,9 @@ Thumbs.db
 
 # Ignore VSCode settings (optional)
 .vscode/
+
+# ignore output data
+results/
+
+# Ignore pycache files
+__pycache__/

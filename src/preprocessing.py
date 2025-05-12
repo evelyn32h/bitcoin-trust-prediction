@@ -1,9 +1,9 @@
 import networkx as nx
 import numpy as np
 
-def convert_to_signed_graph(G):
+def map_to_unweighted_graph(G):
     """
-    Convert weighted directed graph to signed directed graph
+    Convert weighted directed graph to signed directed graph and ensure node IDs are integers.
     
     Parameters:
     G: Original weighted directed graph
@@ -11,8 +11,10 @@ def convert_to_signed_graph(G):
     Returns:
     G_signed: Signed directed graph, edge weights are +1 or -1
     """
-    G_signed = nx.DiGraph()
+    # Relabel nodes to ensure IDs are integers
+    G = nx.relabel_nodes(G, lambda x: int(x) if isinstance(x, float) else x)
     
+    G_signed = nx.DiGraph()
     for u, v, data in G.edges(data=True):
         # Get original weight
         weight = data['weight']
@@ -68,3 +70,44 @@ def filter_neutral_edges(G, threshold=1):
     
     G_filtered.remove_edges_from(edges_to_remove)
     return G_filtered
+
+def reindex_nodes_sequentially(G):
+    """
+    Reindex all nodes in the graph so that they are sequential from 0 to n-1.
+    
+    Parameters:
+    G: Input graph
+    
+    Returns:
+    G_reindexed: Graph with nodes reindexed sequentially
+    """
+    mapping = {old_index: new_index for new_index, old_index in enumerate(G.nodes())}
+    G_reindexed = nx.relabel_nodes(G, mapping)
+    return G_reindexed
+
+def normalize_edge_weights(G):
+    """
+    Normalize all edge weights in the graph to be between -1 and 1.
+    
+    Parameters:
+    G: NetworkX graph
+    
+    Returns:
+    G_normalized: Graph with normalized edge weights
+    """
+    G_normalized = G.copy()
+    weights = [data['weight'] for _, _, data in G.edges(data=True)]
+    
+    if not weights:  # If there are no edges, return the graph as is
+        return G_normalized
+    
+    max_weight = max(weights)
+    min_weight = min(weights)
+    
+    for u, v, data in G_normalized.edges(data=True):
+        if max_weight == min_weight:  # Avoid division by zero if all weights are the same
+            data['weight'] = 0
+        else:
+            data['weight'] = 2 * (data['weight'] - min_weight) / (max_weight - min_weight) - 1
+    
+    return G_normalized
