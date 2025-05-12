@@ -111,3 +111,84 @@ def normalize_edge_weights(G):
             data['weight'] = 2 * (data['weight'] - min_weight) / (max_weight - min_weight) - 1
     
     return G_normalized
+
+def filter_by_embeddedness(G, min_embeddedness=1):
+    """
+    Filter edges by minimum embeddedness threshold
+    
+    Parameters:
+    G: NetworkX graph
+    min_embeddedness: Minimum number of common neighbors required
+    
+    Returns:
+    G_filtered: Graph with filtered edges
+    """
+    # Create a copy of the graph
+    G_filtered = nx.DiGraph()
+    
+    # Create undirected graph to calculate embeddedness
+    G_undirected = G.to_undirected()
+    
+    # Filter edges based on embeddedness
+    edges_kept = []
+    for u, v, data in G.edges(data=True):
+        # Calculate embeddedness (number of common neighbors)
+        common_neighbors = set(G_undirected.neighbors(u)) & set(G_undirected.neighbors(v))
+        
+        # Keep edge if embeddedness is at least min_embeddedness
+        if len(common_neighbors) >= min_embeddedness:
+            G_filtered.add_edge(u, v, **data)
+            edges_kept.append((u, v))
+    
+    print(f"Original graph: {G.number_of_edges()} edges")
+    print(f"Filtered graph: {G_filtered.number_of_edges()} edges")
+    print(f"Removed {G.number_of_edges() - G_filtered.number_of_edges()} edges with embeddedness < {min_embeddedness}")
+    
+    return G_filtered
+
+def create_balanced_dataset(G):
+    """
+    Create a balanced dataset with equal number of positive and negative edges
+    
+    Parameters:
+    G: NetworkX graph
+    
+    Returns:
+    G_balanced: Graph with balanced positive/negative edges
+    """
+    # Get positive and negative edges
+    pos_edges = [(u, v, data) for u, v, data in G.edges(data=True) if data['weight'] > 0]
+    neg_edges = [(u, v, data) for u, v, data in G.edges(data=True) if data['weight'] < 0]
+    
+    print(f"Original graph: {len(pos_edges)} positive edges, {len(neg_edges)} negative edges")
+    print(f"Positive/Negative ratio: {len(pos_edges) / len(neg_edges):.2f}")
+    
+    # Sample positive edges to match negative edges count
+    import random
+    random.seed(42)  # For reproducibility
+    
+    # If we have more positive than negative edges
+    if len(pos_edges) > len(neg_edges):
+        sampled_pos_edges = random.sample(pos_edges, len(neg_edges))
+        final_pos_edges = sampled_pos_edges
+        final_neg_edges = neg_edges
+    # If we have more negative than positive edges (unlikely in this dataset)
+    else:
+        sampled_neg_edges = random.sample(neg_edges, len(pos_edges))
+        final_pos_edges = pos_edges
+        final_neg_edges = sampled_neg_edges
+    
+    # Create new balanced graph
+    G_balanced = nx.DiGraph()
+    
+    # Add positive edges
+    for u, v, data in final_pos_edges:
+        G_balanced.add_edge(u, v, **data)
+    
+    # Add negative edges
+    for u, v, data in final_neg_edges:
+        G_balanced.add_edge(u, v, **data)
+    
+    print(f"Balanced graph: {len(final_pos_edges)} positive edges, {len(final_neg_edges)} negative edges")
+    
+    return G_balanced

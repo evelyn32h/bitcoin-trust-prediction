@@ -11,8 +11,12 @@ Thumbs.db
 # Ignore VSCode settings (optional)
 .vscode/
 
+<<<<<<< HEAD
 # ignore output data
 results/
 
 # Ignore pycache files
 __pycache__/
+=======
+__pycache__/
+>>>>>>> 039c20d (Added my implementation)
