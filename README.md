@@ -16,19 +16,19 @@ This project implements and extends the link prediction algorithm for signed net
 - `notebooks/`: Scripts for exploration and evaluation
   - `explore_data.py`: Data exploration and statistics (basic network analysis, degree distribution, embeddedness)
   - `cross_validation_eval.py`: Original evaluation with 10-fold cross-validation (contains data leakage)
-  - **`strict_evaluation.py`**: **Main evaluation script** - implements Vide's correct method avoiding data leakage
+  - **`strict_evaluation.py`**: **Main evaluation script** - implements correct method avoiding data leakage
   - `strict_evaluation_test.py`: Quick test version (3 folds, 20 edges) for rapid testing
   - `strict_evaluation_sample.py`: Sampled version (5000 edges) for faster approximate results
   - `compare_methods.py`: Compares original method vs strict evaluation to show data leakage impact
   - `optimization_experiments.py`: Tests preprocessing strategies (embeddedness filtering, balanced dataset)
-  - `predict_edge_sign.py`: Demo of single edge prediction (by Vide)
+  - `predict_edge_sign.py`: Demo of single edge prediction with proper feature scaling
   - `sampled_leave_one_out.py`: Leave-one-out evaluation on sampled edges (placeholder)
   - `test_evaluation.py`: Unit tests for evaluation functions
   - `strict_evaluation_resume.py`: Checkpoint support for resuming long evaluations (incomplete)
 - `src/`: Source code
   - `data_loader.py`: Data loading functions
   - `preprocessing.py`: Data preprocessing (filtering, balancing, connectivity)
-  - `feature_extraction.py`: Feature extraction using higher-order cycles (optimized by Vide)
+  - `feature_extraction.py`: Feature extraction using higher-order cycles (with 100x optimization)
   - `models.py`: Prediction models (logistic regression with scaling)
   - `evaluation.py`: Evaluation functions and metrics
   - `utilities.py`: Helper functions for feature statistics
@@ -61,9 +61,9 @@ The original evaluation method had data leakage. When correctly evaluated using 
 ## Notebooks Description
 
 ### Core Evaluation Scripts
-- **`strict_evaluation.py`** 🌟: **The most important file** - correct evaluation implementation following Vide's method. Extracts features from test set (excluding current edge), completely avoiding data leakage. Takes ~40 minutes for full evaluation.
+- **`strict_evaluation.py`** 🌟: **The most important file** - correct evaluation implementation that avoids data leakage. For each test edge, features are extracted from the test set excluding the current edge. Takes ~40 minutes for full evaluation.
 
-- **`strict_evaluation_test.py`**: Quick test version created for rapid iteration while developing the strict evaluation. Uses 3 folds and 20 edges per fold, runs in ~14 seconds.
+- **`strict_evaluation_test.py`**: Quick test version created for rapid iteration while developing the strict evaluation. Uses 3 folds and 20 edges per fold with 50% negative edge sampling, runs in ~14 seconds.
 
 - **`cross_validation_eval.py`**: Original evaluation using standard cross-validation. Contains data leakage as features are extracted from the full graph. Shows inflated performance but kept for comparison.
 
@@ -84,16 +84,32 @@ The original evaluation method had data leakage. When correctly evaluated using 
   - Embeddedness analysis
   - Degree distribution
 
-- **`predict_edge_sign.py`**: Vide's implementation showing how to:
+- **`predict_edge_sign.py`**: Implementation showing how to:
   - Suppress edges for testing
-  - Scale features properly
-  - Make individual predictions
+  - Apply proper feature scaling (required due to expanded feature set)
+  - Make individual predictions with configurable thresholds
 
 - **`test_evaluation.py`**: Unit tests for evaluation functions using simulated data.
 
 ### Incomplete/Placeholder Scripts
-- **`sampled_leave_one_out.py`**: Placeholder for leave-one-out evaluation. Marked as "wait for Vide".
+- **`sampled_leave_one_out.py`**: Placeholder for leave-one-out evaluation.
 - **`strict_evaluation_resume.py`**: Intended for checkpoint support to resume long evaluations. Not fully implemented.
+
+## Technical Details
+
+### Key Methodological Fix
+The strict evaluation method addresses the data leakage problem by:
+1. Splitting edges into train/test folds
+2. For each test edge:
+   - Remove the edge from the test set
+   - Extract features using only remaining test edges
+   - Predict using model trained on training edges
+3. This ensures features for test edges don't include information from the edge being predicted
+
+### Optimizations Implemented
+- **Feature extraction**: Achieved ~100x speedup through sparse matrix operations and parallelization
+- **Node reindexing**: Required after any graph modification to ensure consistency
+- **Feature scaling**: Essential due to expanded feature variety from higher-order cycles
 
 ## How to Run
 ```bash
