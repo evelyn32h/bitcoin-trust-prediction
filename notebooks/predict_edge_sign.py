@@ -5,7 +5,7 @@ import logging
 import networkx as nx
 from sklearn.preprocessing import StandardScaler
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 # Add src directory to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -35,7 +35,7 @@ def train_and_test_model(num_edges_to_suppress=1, threshold=0.5):
     G = reindex_nodes(G) # NOTE: this needs to be run every time before feature extraction if changes has been made to the graph
     
     # Extract features and labels from the undirected graph
-    X, y, edges = feature_matrix_from_graph(G)
+    X, y, edges = feature_matrix_from_graph(G, k=4)
     
     # Suppress edges for testing
     removed_edges = random.sample(edges, num_edges_to_suppress)

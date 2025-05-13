@@ -4,6 +4,7 @@ import scipy.sparse as sp
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from src.utilities import print_feature_statistics
+import time
 
 # Change logging level to see INFO messages (level=logging.INFO)
 logging.basicConfig(level=logging.WARNING)
@@ -50,6 +51,7 @@ def compute_hoc_matrices(A_pos, A_neg, edges, k, max_k, current_products=None):
     Returns:
         dict: Mapping from sequence string to matrix product (sp.spmatrix).
     """
+    start_time = time.time()
     hoc_matrices = {}
     
     while k <= max_k:
@@ -75,11 +77,13 @@ def compute_hoc_matrices(A_pos, A_neg, edges, k, max_k, current_products=None):
         hoc_matrices.update(current_products)
         k += 1
     logger.info(f"Done calculating matrices {list(hoc_matrices.keys())}")
+    elapsed = time.time() - start_time
+    logger.info(f"compute_hoc_matrices completed in {elapsed:.2f} seconds")
     return hoc_matrices
 
 
 
-def symmetricize_matrix_products(matrix_products):
+def symmetricize_hoc_matrices(matrix_products):
     """
     Symmetricize matrix products by combining each sequence with its reverse.
     
@@ -88,6 +92,7 @@ def symmetricize_matrix_products(matrix_products):
     Returns:
         dict: Symmetricized mapping from sequence string to matrix product.
     """
+    start_time = time.time()
     symmetricized_products = {}
     logger.info("Symmteretricizing products, combining: ")
     
@@ -104,12 +109,48 @@ def symmetricize_matrix_products(matrix_products):
             logger.info(f"({seq} and {reverse_seq})")
             symmetricized_products[seq] = product + matrix_products[reverse_seq]
             
-    logger.info("finished")
+    #logger.info("finished")
+    
+    # Log time elapsed
+    elapsed = time.time() - start_time
+    logger.info(f"symmetricize_hoc_matrices completed in {elapsed:.2f} seconds")
+    
     return symmetricized_products
 
 
 
-def extract_undirected_hoc_features(A_pos, A_neg, edges, max_k):
+def extract_features_from_hoc_matrices(hoc_matrices, edges):
+    """
+    Extract features for each edge from HOC matrices.
+    
+    Parameters:
+        hoc_matrices (dict): Mapping from sequence string to matrix product.
+        edges (list): List of edge tuples (u, v).
+    Returns:
+        dict: Mapping from edge tuple to list of features.
+    """
+    start_time = time.time()
+    # Convert edge list to numpy array for efficient batch indexing
+    edge_indices = np.array(edges)
+    feature_list = []
+    # For each HOC matrix, extract all edge values at once and collect as columns
+    for product in hoc_matrices.values():
+        product = product.tocsr()  # Ensure fast row/col indexing
+        vals = product[edge_indices[:,0], edge_indices[:,1]]  # Batch extract edge values
+        vals = np.array(vals).ravel()  # Flatten to 1D array
+        feature_list.append(vals)
+    # Stack all features into a 2D array: shape (n_features, n_edges) -> transpose to (n_edges, n_features)
+    features_matrix = np.stack(feature_list, axis=0).T
+    # Build the dictionary mapping each edge to its feature vector
+    features = {edge: list(features_matrix[i]) for i, edge in enumerate(edges)}
+    # Log time elapsed
+    elapsed = time.time() - start_time
+    logger.info(f"extract_features_from_hoc_matrices completed in {elapsed:.2f} seconds")
+    return features
+
+
+
+def hoc_features_from_undriected_adjacency_matrix(A_pos, A_neg, edges, max_k):
     """
     Extract undirected HOC features for each edge.
     
@@ -121,33 +162,23 @@ def extract_undirected_hoc_features(A_pos, A_neg, edges, max_k):
     Returns:
         dict: Mapping from edge tuple to list of HOC features.
     """
+    start_time = time.time()
     logger.info(f"Extracting higher-order cycle of length < {max_k}")
         
     matrix_products =  compute_hoc_matrices(A_pos, A_neg, edges, 3, max_k, current_products={"+": A_pos, "-": A_neg})
     
     # Symmetricize the products
-    symmetricized_products = symmetricize_matrix_products(matrix_products)
+    symmetricized_products = symmetricize_hoc_matrices(matrix_products)
     
     logger.info(f"Final feature keys: {list(symmetricized_products.keys())}")
     logger.info("Extracting features...")
     
     # Extract features
-    features = {edge: [] for edge in edges}  # Initialize features for each edge
-    
-    # If edges are node labels, map to indices
-    # But in this code, edges are already indices (from nodelist=sorted(G.nodes())), so we can use directly
-    edge_indices = np.array(edges)
-    
-    # For each product, extract all edge values at once
-    for product in symmetricized_products.values():
-        # Ensure product is in CSR format for efficient row/col indexing
-        product = product.tocsr()
-        vals = product[edge_indices[:,0], edge_indices[:,1]]
-        # vals is a matrix with shape (n_edges, 1), convert to 1D array
-        vals = np.array(vals).ravel()
-        
-        for idx, edge in enumerate(edges):
-            features[edge].append(vals[idx])
+    features = extract_features_from_hoc_matrices(symmetricized_products, edges)
+
+    # Log time elapsed
+    elapsed = time.time() - start_time
+    logger.info(f"TOTAL time for hoc features: {elapsed:.2f} seconds")
     
     return features  
 
@@ -181,7 +212,7 @@ def feature_matrix_from_graph(G, edges=None, k=4):
     A_pos, A_neg = get_sparse_adjacency_matrices(G_undirected)
 
     # Extract higher-order features for all edges
-    higher_order_features = extract_undirected_hoc_features(A_pos, A_neg, edge_list, k)
+    higher_order_features = hoc_features_from_undriected_adjacency_matrix(A_pos, A_neg, edge_list, k)
 
     # Print feature statistics if logging level is INFO or lower
     if logger.isEnabledFor(logging.INFO):
