@@ -10,7 +10,7 @@ sys.path.append(os.path.join('..'))
 
 # Import custom modules
 from src.data_loader import load_bitcoin_data
-from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity, reindex_nodes_sequentially
+from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity, reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
 from src.models import train_edge_sign_classifier, predict_edge_signs
 from src.evaluation import evaluate_sign_predictor, plot_roc_curve, plot_confusion_matrix
@@ -238,7 +238,7 @@ def main():
     G = filter_neutral_edges(G)
     G_signed = map_to_unweighted_graph(G)
     G_connected = ensure_connectivity(G_signed)
-    G_processed = reindex_nodes_sequentially(G_connected)
+    G_processed = reindex_nodes(G_connected)
     
     print(f"Final graph: {G_processed.number_of_nodes()} nodes, {G_processed.number_of_edges()} edges")
     

@@ -1,139 +1,176 @@
 import networkx as nx
 import numpy as np
+import scipy.sparse as sp
+from concurrent.futures import ThreadPoolExecutor
+import logging
+from src.utilities import print_feature_statistics
 
-def get_pos_neg_adjacency_matrix(G):
+# Change logging level to see INFO messages (level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+
+
+def get_sparse_adjacency_matrices(G):
     """
-    Convert a graph to two adjacency matrices: one for positive edges and one for negative edges.
-    Positive edges have weights > 0, and negative edges have weights < 0.
+    Return sparse adjacency matrices for positive and negative edges.
     
     Parameters:
-    G: NetworkX directed graph
-    
+        G (networkx.Graph): Input graph with signed edge weights.
     Returns:
-    A_pos: Adjacency matrix for positive edges (weights > 0)
-    A_neg: Adjacency matrix for negative edges (absolute values of weights < 0)
+        tuple: (A_pos, A_neg) where A_pos and A_neg are CSR sparse adjacency matrices for positive and negative edges, respectively.
     """
-    print(f"Graph size: {len(G.nodes())} nodes, {len(G.edges())} edges")
     
-    # Convert graph to adjacency matrix
-    A_pos = nx.to_numpy_array(G, dtype=np.float64, weight='weight', nodelist=sorted(G.nodes()))
-    A_neg = np.copy(A_pos)
-    
-    # Setparate positive and negative edges
-    A_pos[A_pos < 0] = 0  # Keep only positive weights
-    A_neg[A_neg > 0] = 0  # Keep only negative weights
-    A_neg = np.abs(A_neg)  # Convert negative weights to positive for processing
-  
-    return A_pos, A_neg
+    # Get the adjacency matrix (scipy sparse matrix)
+    A = nx.adjacency_matrix(G, weight='weight', nodelist=sorted(G.nodes()))
+    # Copy for positive and negative
+    A_pos = A.copy().tolil()
+    A_neg = A.copy().tolil()
+    # Set negative values to 0 in A_pos, positive to 0 in A_neg
+    A_pos[A_pos < 0] = 0
+    A_neg[A_neg > 0] = 0
+    # Convert negative values to positive in A_neg
+    A_neg = abs(A_neg)
+    # Convert back to preferred sparse format (csr)
+    return A_pos.tocsr(), A_neg.tocsr()
 
-def extract_undirected_hoc_features(A_pos, A_neg, edges, max_k):
-    """
-    Extract higher-order cycle (HOC) features for each edge (u, v) in an undirected graph.
-    The function computes matrix products for sequences of positive and negative adjacency matrices
-    and symmetrizes the results to capture undirected cycles.
-    
-    Parameters:
-    A_pos: Adjacency matrix for positive edges (binary, 1s and 0s)
-    A_neg: Adjacency matrix for negative edges (binary, 1s and 0s)
-    edges: List of edges (u, v) for which to extract features
-    max_k: Maximum order of cycles to consider
-    
-    Returns:
-    features: Dictionary where keys are edge tuples and values are lists of features for each k
-    """
-    print(f"Extracting higher-order cycle of length < {max_k}")
-        
-    matrix_products =  compute_hoc_matrices(A_pos, A_neg, edges, 3, max_k, current_products={"+": A_pos, "-": A_neg})
-    
-    print("Symmteretricizing products...")
-    
-    # Symmetricize the products
-    symmetricized_products = {}
-    for seq, product in matrix_products.items():
-        reverse_seq = seq[::-1]
-        if reverse_seq in symmetricized_products:
-            # Already processed the reverse sequence
-            continue
-        if reverse_seq == seq:
-            # Already symmetric
-            symmetricized_products[seq] = product
-        else:
-            print(f"Summing {seq} and {reverse_seq}")
-            symmetricized_products[seq] = product + matrix_products[reverse_seq]
-
-    # Convert the dictionary values to a list
-    symmetricized_products = list(symmetricized_products.values())
-
-    print("Extracting features...")
-    
-    # Extract features
-    features = {edge: [] for edge in edges}  # Initialize features for each edge
-        
-    for u, v in edges:
-        for product in symmetricized_products:
-            features[(u, v)].append(product[u, v])
-            
-    return features  
 
 
 def compute_hoc_matrices(A_pos, A_neg, edges, k, max_k, current_products=None):
     """
-    Recursively compute higher-order cycle (HOC) matrices for sequences of positive and negative adjacency matrices.
-    Each recursion step computes matrix products for the next order of cycles.
+    Iteratively compute higher-order cycle (HOC) matrices.
     
     Parameters:
-    A_pos: Adjacency matrix for positive edges (binary, 1s and 0s)
-    A_neg: Adjacency matrix for negative edges (binary, 1s and 0s)
-    edges: List of edges (u, v) for which to extract features
-    k: Current order of cycles being processed
-    max_k: Maximum order of cycles to consider
-    current_products: Dictionary of current matrix products for sequences (default: None)
-    
+        A_pos (sp.spmatrix): Positive adjacency matrix (CSR format).
+        A_neg (sp.spmatrix): Negative adjacency matrix (CSR format).
+        edges (list): List of edge tuples (u, v).
+        k (int): Starting cycle length.
+        max_k (int): Maximum cycle length.
+        current_products (dict): Current matrix products by sequence key.
     Returns:
-    current_products: Dictionary where keys are sequences of "+" and "-" and values are the corresponding matrix products
+        dict: Mapping from sequence string to matrix product (sp.spmatrix).
     """
-    # Base case: stop recursion when k exceeds max_k
-    if k > max_k:
-        print(f"Done calculating matrices {list(current_products.keys())}")
-        return current_products
+    hoc_matrices = {}
+    
+    while k <= max_k:
+        logger.info(f"Calculating cycles of length {k}, requiring {len(current_products)*2} matrix products... ")
+        next_products = {}
+        def compute_products(seq_product):
+            seq, product = seq_product
+            # Compute next order products
+            prod_pos = product @ A_pos
+            prod_neg = product @ A_neg
+            return [
+                (seq + "+", prod_pos),
+                (seq + "-", prod_neg)
+            ]
+        # Parallelize the computation of matrix products
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(compute_products, current_products.items()))
+        for res in results:
+            for seq_key, prod in res:
+                next_products[seq_key] = prod
+        logger.info("finished")
+        current_products = next_products
+        hoc_matrices.update(current_products)
+        k += 1
+    logger.info(f"Done calculating matrices {list(hoc_matrices.keys())}")
+    return hoc_matrices
 
-    print(f"Calculating cycles of length {k}, requiring {len(current_products)*2} matrix products:")
+
+
+def symmetricize_matrix_products(matrix_products):
+    """
+    Symmetricize matrix products by combining each sequence with its reverse.
     
-    next_products = {}
-    for idx, (seq, product) in enumerate(current_products.items()):        
-        # Append the new products for the next order
-        print(f"({seq} dot +)", end=", ", flush=True)
-        next_products[seq + "+"] = np.dot(product, A_pos)
-        print(f"({seq} dot -)", end=", ", flush=True)
-        next_products[seq + "-"] = np.dot(product, A_neg)
+    Parameters:
+        matrix_products (dict): Mapping from sequence string to matrix product.
+    Returns:
+        dict: Symmetricized mapping from sequence string to matrix product.
+    """
+    symmetricized_products = {}
+    logger.info("Symmteretricizing products, combining: ")
+    
+    for seq, product in matrix_products.items():
+        reverse_seq = seq[::-1]
+        if reverse_seq in symmetricized_products:
+            # If the reverse sequence is already processed, skip it
+            continue
+        if reverse_seq == seq:
+            # If the sequence is symmetric (e.g., "++"), just add it to the result
+            symmetricized_products[seq] = product
+        else:
+            # Make matrix symmetric by adding the product with its reverse
+            logger.info(f"({seq} and {reverse_seq})")
+            symmetricized_products[seq] = product + matrix_products[reverse_seq]
+            
+    logger.info("finished")
+    return symmetricized_products
+
+
+
+def extract_undirected_hoc_features(A_pos, A_neg, edges, max_k):
+    """
+    Extract undirected HOC features for each edge.
+    
+    Parameters:
+        A_pos (sp.spmatrix): Positive adjacency matrix (CSR format).
+        A_neg (sp.spmatrix): Negative adjacency matrix (CSR format).
+        edges (list): List of edge tuples (u, v).
+        max_k (int): Maximum cycle length.
+    Returns:
+        dict: Mapping from edge tuple to list of HOC features.
+    """
+    logger.info(f"Extracting higher-order cycle of length < {max_k}")
         
-    print("finished")
+    matrix_products =  compute_hoc_matrices(A_pos, A_neg, edges, 3, max_k, current_products={"+": A_pos, "-": A_neg})
     
-    # Recur for the next order (k+1)
-    return compute_hoc_matrices(A_pos, A_neg, edges, k + 1, max_k, next_products)
+    # Symmetricize the products
+    symmetricized_products = symmetricize_matrix_products(matrix_products)
+    
+    logger.info(f"Final feature keys: {list(symmetricized_products.keys())}")
+    logger.info("Extracting features...")
+    
+    # Extract features
+    features = {edge: [] for edge in edges}  # Initialize features for each edge
+    
+    # If edges are node labels, map to indices
+    # But in this code, edges are already indices (from nodelist=sorted(G.nodes())), so we can use directly
+    edge_indices = np.array(edges)
+    
+    # For each product, extract all edge values at once
+    for product in symmetricized_products.values():
+        # Ensure product is in CSR format for efficient row/col indexing
+        product = product.tocsr()
+        vals = product[edge_indices[:,0], edge_indices[:,1]]
+        # vals is a matrix with shape (n_edges, 1), convert to 1D array
+        vals = np.array(vals).ravel()
+        
+        for idx, edge in enumerate(edges):
+            features[edge].append(vals[idx])
+    
+    return features  
+
 
 
 def feature_matrix_from_graph(G, edges=None, k=4):
     """
-    Create a feature matrix for all edges or a subset of edges from a directed graph.
-    The function extracts higher-order cycle features using adjacency matrices for positive and negative edges.
+    Return feature matrix, labels, and edge list for given edges.
     
     Parameters:
-    G: NetworkX directed graph
-    edges: List of edges to extract features for (default: all edges in G)
-    k: Maximum order to consider for higher-order features (default: 3)
-    
+        G (networkx.Graph): Input graph with signed edge weights.
+        edges (list, optional): List of edge tuples (u, v, data). If None, use all edges.
+        k (int): Maximum cycle length for HOC features.
     Returns:
-    X: Feature matrix (NumPy array) where each row corresponds to an edge
-    y: Label vector (NumPy array) containing edge weights
-    edges: List of edges corresponding to rows in X
+        tuple: (X, y, edge_list) where X is the feature matrix, y is the label vector, and edge_list is the list of edge tuples.
     """
-
+    
+    # Check if edges are provided, otherwise use all edges in the graph
     if edges is None:
         edges = list(G.edges(data=True))  # Include edge attributes
 
-    print(f"Extracting features for {len(edges)} edges")
-
+    logger.info(f"Extracting features for {len(edges)} edges")
+    
     # Initialize feature matrix, labels, and edge list
     X = []
     y = []
@@ -141,19 +178,20 @@ def feature_matrix_from_graph(G, edges=None, k=4):
     
     # Convert graph to adjacency matrices
     G_undirected = G.to_undirected()
-    A_pos, A_neg = get_pos_neg_adjacency_matrix(G_undirected)
+    A_pos, A_neg = get_sparse_adjacency_matrices(G_undirected)
 
     # Extract higher-order features for all edges
     higher_order_features = extract_undirected_hoc_features(A_pos, A_neg, edge_list, k)
 
-    for idx, (u, v, data) in enumerate(edges):
-        # Add edge features
-        X.append(higher_order_features[(u, v)])
+    # Print feature statistics if logging level is INFO or lower
+    if logger.isEnabledFor(logging.INFO):
+        print_feature_statistics(higher_order_features)
 
-        # Extract edge label (edge weight)
-        y.append(data.get('weight', 0))  # Default weight is 0 if not present
+    # Construct feature matrix 
+    X = [higher_order_features[(u, v)] for u, v, _ in edges]
+    y = [data.get('weight', 0) for _, _, data in edges]
 
-    print(f"Feature matrix shape: {len(X)} rows, {len(X[0]) if X else 0} columns")
-    # print(f"Feature matrix sample values: {X[:5] if len(X) > 5 else X}")
+    logger.info(f"Feature matrix shape: {len(X)} rows, {len(X[0]) if X else 0} columns")
+    logger.debug(f"Feature matrix sample values: {X[:5] if len(X) > 5 else X}")
     
     return np.array(X), np.array(y), edge_list

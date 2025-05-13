@@ -71,7 +71,7 @@ def filter_neutral_edges(G, threshold=1):
     G_filtered.remove_edges_from(edges_to_remove)
     return G_filtered
 
-def reindex_nodes_sequentially(G):
+def reindex_nodes(G):
     """
     Reindex all nodes in the graph so that they are sequential from 0 to n-1.
     

@@ -1,4 +1,5 @@
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 
 def train_edge_sign_classifier(X, y):
@@ -46,3 +47,28 @@ def print_model_info(model):
         print("Model intercept:", model.intercept_)
     else:
         print("Model does not have accessible coefficients or intercept.")
+
+def scale_training_features(X_train):
+    """
+    Fit a StandardScaler on training features and return the scaler and scaled features.
+    
+    Parameters:
+        X_train (array-like): Training feature matrix.
+    Returns:
+        tuple: (X_train_scaled, scaler)
+    """
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    return X_train_scaled, scaler
+
+def scale_test_features(X_test, scaler):
+    """
+    Scale test features using a pre-fitted scaler.
+    
+    Parameters:
+        X_test (array-like): Test feature matrix.
+        scaler (StandardScaler): Pre-fitted scaler.
+    Returns:
+        array: Scaled test feature matrix.
+    """
+    return scaler.transform(X_test)
