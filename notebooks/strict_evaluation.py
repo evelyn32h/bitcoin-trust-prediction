@@ -68,42 +68,39 @@ def strict_evaluation(G, n_folds=10, cycle_length=3):
         print("Training model...")
         model = train_edge_sign_classifier(X_train_scaled, y_train)
         
-        # Pre-filter test edges for valid nodes
-        print("Pre-filtering test edges...")
-        valid_edges = []
-        invalid_edges = []
-        
-        train_nodes = set(G_train.nodes())
-        for i, (u, v, data) in enumerate(test_edges):
-            if u in train_nodes and v in train_nodes:
-                valid_edges.append((i, u, v, data))
-            else:
-                invalid_edges.append((i, u, v, data))
-        
-        print(f"Valid edges: {len(valid_edges)}, Invalid edges: {len(invalid_edges)}")
-        
-        # Process invalid edges quickly
-        for _, _, _, data in invalid_edges:
-            all_y_true.append(data['weight'])
-            all_y_pred.append(1)  # Default positive
-            all_y_prob.append(0.5)
-        
-        # Process valid edges with better progress tracking
-        print(f"Predicting {len(valid_edges)} valid test edges...")
+        # Process test edges (no need to filter anymore as per Vide)
+        print(f"Predicting {len(test_edges)} test edges...")
         pred_start = time.time()
         edge_times = []
         
-        for idx, (orig_idx, u, v, data) in enumerate(valid_edges):
+        for idx, (u, v, data) in enumerate(test_edges):
             edge_start = time.time()
             
             # True label
             true_sign = data['weight']
             all_y_true.append(true_sign)
             
+            # Create test graph without current edge
+            G_test = nx.DiGraph()
+            for j, (u2, v2, data2) in enumerate(test_edges):
+                if j != idx:  # Skip current edge
+                    G_test.add_edge(u2, v2, **data2)
+            
+            # Ensure connectivity and reindex for test graph
+            if G_test.number_of_edges() > 0:
+                G_test = ensure_connectivity(G_test)
+                G_test = reindex_nodes(G_test)
+            
+            # Check if nodes exist in test graph
+            if G_test.number_of_edges() == 0 or u not in G_test.nodes() or v not in G_test.nodes():
+                all_y_pred.append(1)  # Default positive
+                all_y_prob.append(0.5)
+                continue
+            
             try:
-                # Extract features for this edge
+                # Extract features from TEST graph (not training!) - This is the key fix
                 X_test, _, _ = feature_matrix_from_graph(
-                    G_train, 
+                    G_test,  # Changed from G_train to G_test
                     edges=[(u, v, {'weight': 1})],
                     k=cycle_length
                 )
@@ -126,13 +123,13 @@ def strict_evaluation(G, n_folds=10, cycle_length=3):
             edge_times.append(edge_time)
             
             # Update progress every 50 edges
-            if (idx + 1) % 50 == 0 or (idx + 1) == len(valid_edges):
+            if (idx + 1) % 50 == 0 or (idx + 1) == len(test_edges):
                 avg_time = np.mean(edge_times[-50:]) if len(edge_times) >= 50 else np.mean(edge_times)
                 elapsed = time.time() - pred_start
                 rate = (idx + 1) / elapsed
-                remaining = (len(valid_edges) - idx - 1) / rate
+                remaining = (len(test_edges) - idx - 1) / rate
                 
-                print(f"  Progress: {idx+1}/{len(valid_edges)} ({rate:.1f} edges/sec, "
+                print(f"  Progress: {idx+1}/{len(test_edges)} ({rate:.1f} edges/sec, "
                       f"~{remaining/60:.1f} min remaining)")
         
         fold_time = time.time() - fold_start

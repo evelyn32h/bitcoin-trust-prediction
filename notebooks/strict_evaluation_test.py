@@ -44,19 +44,24 @@ def strict_evaluation_test(G, n_folds=3, cycle_length=3, edges_per_fold=20):
         train_edges = [all_edges[i] for i in train_idx]
         test_edges = [all_edges[i] for i in test_idx]
         
-        # Sample test edges (ensure some negative edges)
-        pos_test_edges = [e for e in test_edges if e[2]['weight'] > 0]
-        neg_test_edges = [e for e in test_edges if e[2]['weight'] < 0]
+        # Sample test edges (ensure 50% negative edges as per Vide)
+        pos_test_edges = [(i, e) for i, e in enumerate(test_edges) if e[2]['weight'] > 0]
+        neg_test_edges = [(i, e) for i, e in enumerate(test_edges) if e[2]['weight'] < 0]
         
-        # Sample proportionally
-        n_pos_sample = int(edges_per_fold * 0.8)  # 80% positive
-        n_neg_sample = edges_per_fold - n_pos_sample
+        # Sample 50/50 positive/negative
+        n_pos_sample = edges_per_fold // 2
+        n_neg_sample = edges_per_fold // 2
+        
+        # Handle case where we don't have enough negative edges
+        if len(neg_test_edges) < n_neg_sample:
+            n_neg_sample = len(neg_test_edges)
+            n_pos_sample = edges_per_fold - n_neg_sample
         
         sampled_pos = random.sample(pos_test_edges, min(n_pos_sample, len(pos_test_edges)))
         sampled_neg = random.sample(neg_test_edges, min(n_neg_sample, len(neg_test_edges)))
         sampled_test_edges = sampled_pos + sampled_neg
         
-        print(f"\nFold {fold}/{n_folds} (sampled {len(sampled_test_edges)} test edges)...")
+        print(f"\nFold {fold}/{n_folds} (sampled {len(sampled_test_edges)} test edges: {len(sampled_pos)} pos, {len(sampled_neg)} neg)...")
         
         # Create training graph
         G_train = nx.DiGraph()
@@ -81,21 +86,32 @@ def strict_evaluation_test(G, n_folds=3, cycle_length=3, edges_per_fold=20):
         # Process sampled test edges
         print(f"Predicting {len(sampled_test_edges)} sampled test edges...")
         
-        for u, v, data in sampled_test_edges:
+        for idx_in_test, (u, v, data) in sampled_test_edges:
             # True label
             true_sign = data['weight']
             all_y_true.append(true_sign)
             
-            # Check if nodes exist in training graph
-            if u not in G_train.nodes() or v not in G_train.nodes():
+            # Create test graph without current edge
+            G_test = nx.DiGraph()
+            for j, (u2, v2, data2) in enumerate(test_edges):
+                if j != idx_in_test:  # Skip current edge
+                    G_test.add_edge(u2, v2, **data2)
+            
+            # Ensure connectivity and reindex
+            if G_test.number_of_edges() > 0:
+                G_test = ensure_connectivity(G_test)
+                G_test = reindex_nodes(G_test)
+            
+            # Check if nodes exist in test graph
+            if G_test.number_of_edges() == 0 or u not in G_test.nodes() or v not in G_test.nodes():
                 all_y_pred.append(1)
                 all_y_prob.append(0.5)
                 continue
             
             try:
-                # Extract features
+                # Extract features from TEST graph (not training!) - This is the key fix
                 X_test, _, _ = feature_matrix_from_graph(
-                    G_train, 
+                    G_test,  # Changed from G_train to G_test
                     edges=[(u, v, {'weight': 1})],
                     k=cycle_length
                 )
@@ -141,7 +157,7 @@ def main():
     
     # Run test evaluation
     print("\n" + "="*50)
-    print("Running Vide's test evaluation (3 folds, 20 edges per fold)...")
+    print("Running Vide's test evaluation (3 folds, 20 edges per fold, 50% negative)...")
     
     metrics = strict_evaluation_test(G_connected, n_folds=3, cycle_length=3, edges_per_fold=20)
     
