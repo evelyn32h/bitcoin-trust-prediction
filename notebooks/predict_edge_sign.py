@@ -5,7 +5,7 @@ import logging
 import networkx as nx
 from sklearn.preprocessing import StandardScaler
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 # Add src directory to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
