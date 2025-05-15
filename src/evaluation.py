@@ -225,8 +225,27 @@ def plot_confusion_matrix(y_true, y_pred, save_path=None):
     y_pred: Predicted edge signs
     save_path: Path to save the image (optional)
     """
+    # Print class distribution in the evaluation set for verification
+    unique, counts = np.unique(y_true, return_counts=True)
+    class_dist = dict(zip(unique, counts))
+    total = len(y_true)
+    print("Evaluation set class distribution:")
+    for cls, count in class_dist.items():
+        print(f"  Class {cls}: {count} edges ({count/total*100:.1f}%)")
+    
     # Calculate confusion matrix
     cm = confusion_matrix(y_true, y_pred)
+    
+    # Get positive and negative counts for debugging
+    pos_true = np.sum(y_true == 1)
+    neg_true = np.sum(y_true == -1)
+    pos_ratio = pos_true / len(y_true)
+    
+    # Print warning if distribution differs from expected
+    if pos_ratio < 0.7:  # If less than 70% positive (expected 89%)
+        print(f"\nWARNING: Evaluation set has {pos_ratio:.1%} positive edges")
+        print(f"This differs from the expected 89% in the original dataset")
+        print(f"Positive: {pos_true}, Negative: {neg_true}, Total: {len(y_true)}")
     
     # Plot confusion matrix
     plt.figure(figsize=(8, 6))
@@ -236,6 +255,11 @@ def plot_confusion_matrix(y_true, y_pred, save_path=None):
     plt.xlabel('Predicted Sign')
     plt.ylabel('True Sign')
     plt.title('Confusion Matrix')
+    
+    # Add dataset statistics for reference
+    plt.figtext(0.5, 0.01, 
+               f"Evaluation set: {pos_ratio:.1%} positive edges (Dataset: 89% positive)",
+               ha="center", fontsize=10, bbox={"facecolor":"orange", "alpha":0.2})
     
     if save_path:
         plt.savefig(save_path)

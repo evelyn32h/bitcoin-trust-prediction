@@ -177,7 +177,7 @@ def main():
     print("Running quick evaluation...")
     
     # k=3
-    metrics_k3 = reduced_evaluation(G_connected, n_folds=4, cycle_length=4, predictions_per_fold=500, pos_edges_ratio=0.2)
+    metrics_k3 = reduced_evaluation(G_connected, n_folds=4, cycle_length=4, predictions_per_fold=500, pos_edges_ratio=0.89)
     
     print("\nStrict Evaluation Results (k=3):")
     for key, value in metrics_k3.items():
