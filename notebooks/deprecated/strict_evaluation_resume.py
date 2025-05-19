@@ -5,7 +5,7 @@ import numpy as np
 
 sys.path.append(os.path.join('..'))
 
-from strict_evaluation import strict_evaluation
+from notebooks.deprecated.strict_evaluation import strict_evaluation
 
 def strict_evaluation_with_checkpoint(G, n_folds=10, cycle_length=3, checkpoint_dir='checkpoints'):
     """

@@ -8,9 +8,10 @@ import networkx as nx
 from sklearn.model_selection import KFold
 import logging
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 
 from src.utilities import sample_edges_with_positive_ratio
-
 from src.data_loader import load_bitcoin_data
 from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity, reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
@@ -64,7 +65,7 @@ def process_fold(args):
     G_test = ensure_connectivity(G_test)
     G_test = reindex_nodes(G_test)
     
-    # Extract training features
+    # Extract training features and train model
     X_train, y_train, _ = feature_matrix_from_graph(G_train, k=cycle_length)
     X_train_scaled, scaler = scale_training_features(X_train)
     model = train_edge_sign_classifier(X_train_scaled, y_train)
@@ -127,7 +128,6 @@ def reduced_evaluation(G, n_folds=10, cycle_length=3, predictions_per_fold=20, p
     
     # Create folds
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-    from concurrent.futures import ProcessPoolExecutor, as_completed
     
     # Prepare arguments for each fold
     fold_args = [
@@ -177,7 +177,7 @@ def main():
     print("Running quick evaluation...")
     
     # k=3
-    metrics_k3 = reduced_evaluation(G_connected, n_folds=4, cycle_length=4, predictions_per_fold=500, pos_edges_ratio=0.89)
+    metrics_k3 = reduced_evaluation(G_connected, n_folds=4, cycle_length=4, predictions_per_fold=100, pos_edges_ratio=0.89)
     
     print("\nStrict Evaluation Results (k=3):")
     for key, value in metrics_k3.items():

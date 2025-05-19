@@ -208,7 +208,10 @@ def feature_matrix_from_graph(G, edges=None, k=4):
     edge_list = [(u, v) for u, v, _ in edges]  # Extract edge tuples
     
     # Convert graph to adjacency matrices
-    G_undirected = G.to_undirected()
+    if G.is_directed():
+        G_undirected = G.to_undirected()
+    else:
+        G_undirected = G
     A_pos, A_neg = get_sparse_adjacency_matrices(G_undirected)
 
     # Extract higher-order features for all edges

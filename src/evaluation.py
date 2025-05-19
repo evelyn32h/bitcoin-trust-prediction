@@ -1,3 +1,4 @@
+import os
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix, roc_curve, auc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,6 +18,9 @@ def evaluate_sign_predictor(y_true, y_pred, y_prob=None):
     Returns:
     metrics: Dictionary containing evaluation metrics
     """
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
     # Calculate accuracy
     accuracy = accuracy_score(y_true, y_pred)
     
@@ -47,6 +51,7 @@ def evaluate_sign_predictor(y_true, y_pred, y_prob=None):
     
     # Calculate AUC if probabilities are provided
     if y_prob is not None:
+        y_prob = np.array(y_prob)
         # Convert labels to binary for AUC calculation
         y_binary = (y_true + 1) / 2  # Convert from {-1, 1} to {0, 1}
         auc_score = roc_auc_score(y_binary, y_prob)
@@ -195,6 +200,7 @@ def cml_evaluation(model, X, y, edges, removed_edges, threshold=0.5):
     Returns:
     results: List of dictionaries containing prediction details for each sampled edge
     """
+    #TODO: delete this function
     results = []
     for edge in removed_edges:
         edge_index = edges.index(edge)
@@ -327,3 +333,23 @@ def cross_validate(X, y, model_func, n_splits=5, class_weight=None):
     }
     
     return cv_results
+
+def save_and_plot_results(all_y_true, all_y_pred, all_y_prob, evaluation_name, cycle_length):
+    """
+    Convert results to arrays, evaluate, save, and plot.
+    """
+
+    # Convert to arrays
+    all_y_true = np.array(all_y_true)
+    all_y_pred = np.array(all_y_pred)
+    all_y_prob = np.array(all_y_prob)
+    
+    # Save results
+    results_dir = os.path.join('..', 'results', f'{evaluation_name}_evaluation')
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Generate plots
+    plot_roc_curve(all_y_true, all_y_prob, 
+                   save_path=os.path.join(results_dir, f'{evaluation_name}_roc_k{cycle_length}.png'))
+    plot_confusion_matrix(all_y_true, all_y_pred,
+                         save_path=os.path.join(results_dir, f'{evaluation_name}_cm_k{cycle_length}.png'))

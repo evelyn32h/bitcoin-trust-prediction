@@ -7,8 +7,8 @@ sys.path.append(os.path.join('..'))
 
 from src.data_loader import load_bitcoin_data
 from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity, reindex_nodes
-from cross_validation_eval import run_cross_validation
-from strict_evaluation import strict_evaluation
+from notebooks.deprecated.cross_validation_eval import run_cross_validation
+from notebooks.deprecated.strict_evaluation import strict_evaluation
 
 def compare_evaluation_methods(cycle_length=4):
     """

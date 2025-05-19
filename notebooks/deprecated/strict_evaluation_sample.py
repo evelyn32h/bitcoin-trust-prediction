@@ -5,7 +5,7 @@ import random
 
 sys.path.append(os.path.join('..'))
 
-from strict_evaluation import strict_evaluation
+from notebooks.deprecated.strict_evaluation import strict_evaluation
 from src.data_loader import load_bitcoin_data
 from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity
 
