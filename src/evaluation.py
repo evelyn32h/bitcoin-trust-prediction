@@ -1,10 +1,27 @@
+import csv
+import datetime
+import json
+import logging
 import os
-from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix, roc_curve, auc
+import pickle
+from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix, roc_curve, auc, precision_recall_curve, average_precision_score, precision_score, recall_score, f1_score
+import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Set project root as working directory
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+os.chdir(PROJECT_ROOT)
+
+from src.feature_extraction import feature_matrix_from_graph
 from src.models import predict_edge_signs
+
+# Load config from YAML
+with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
+    config = yaml.safe_load(f)
+
+DEFAULT_THRESHOLD = config['default_threshold']
 
 def evaluate_sign_predictor(y_true, y_pred, y_prob=None):
     """
@@ -59,7 +76,137 @@ def evaluate_sign_predictor(y_true, y_pred, y_prob=None):
     
     return metrics
 
-def plot_roc_curve(y_true, y_prob, save_path=None):
+
+def calculate_best_f1_threshold(y_true, y_prob, thresholds=None):
+    """
+    Find the best threshold for converting probabilities to labels based on F1 score.
+    Returns the best threshold, best F1 score, all thresholds, and all F1 scores.
+    """
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    if thresholds is None:
+        thresholds = np.linspace(0, 1, 101)
+    best_f1 = -np.inf
+    best_threshold = 0.5
+    f1_scores = []
+    for thresh in thresholds:
+        y_pred = np.where(y_prob >= thresh, 1, -1)
+        tp = np.sum((y_pred == 1) & (y_true == 1))
+        fp = np.sum((y_pred == 1) & (y_true == -1))
+        fn = np.sum((y_pred == -1) & (y_true == 1))
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        f1_scores.append(f1)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = thresh
+    return best_threshold, best_f1, thresholds, f1_scores
+
+def calculate_best_accuracy_threshold(y_true, y_prob, thresholds=None):
+    """
+    Find the best threshold for converting probabilities to labels based on accuracy.
+    Returns the best threshold, best accuracy, all thresholds, and all accuracy scores.
+    """
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    if thresholds is None:
+        thresholds = np.linspace(0, 1, 101)
+    best_acc = -np.inf
+    best_threshold = 0.5
+    acc_scores = []
+    for thresh in thresholds:
+        y_pred = np.where(y_prob >= thresh, 1, -1)
+        acc = (y_pred == y_true).mean()
+        acc_scores.append(acc)
+        if acc > best_acc:
+            best_acc = acc
+            best_threshold = thresh
+    return best_threshold, best_acc, thresholds, acc_scores
+
+def calculate_evaluation_metrics(y_true, y_prob, thresholds=None, default_threshold=None):
+    """
+    Calculate evaluation metrics for a range of thresholds and return best F1 and accuracy thresholds and their metrics.
+    Returns a dictionary with best F1/accuracy, thresholds, and metrics at the default threshold.
+    """
+    if default_threshold is None:
+        default_threshold = DEFAULT_THRESHOLD
+        
+    if thresholds is None:
+        thresholds = np.linspace(0, 1, 101)
+    
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    
+    # find best threshold values
+    best_f1_thresh, best_f1, _, _ = calculate_best_f1_threshold(y_true, y_prob, thresholds)
+    best_acc_thresh, best_acc, _, _ = calculate_best_accuracy_threshold(y_true, y_prob, thresholds)
+    
+    # threshold independet metrics
+    y_binary = (y_true + 1) / 2  # Convert from {-1, 1} to {0, 1}
+    roc_auc = roc_auc_score(y_binary, y_prob)
+    average_precision = average_precision_score(y_binary, y_prob)
+    
+    return {
+        'default_threshold': default_threshold,
+        'best_f1_threshold': best_f1_thresh,
+        'best_f1': best_f1,
+        'best_accuracy_threshold': best_acc_thresh,
+        'best_accuracy': best_acc,
+        'roc_auc': roc_auc,
+        'average_precision': average_precision,
+    }
+    
+def calculate_test_metrics(y_true, y_pred, y_prob=None):
+    """
+    Calculate and return test metrics that are dependent on the threshold.
+    Returns a dictionary with accuracy, confusion matrix, F1, precision, recall, specificity, and false positive rate.
+    Uses sklearn metrics where possible.
+    """
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    acc = accuracy_score(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, labels=[-1, 1])
+    if cm.shape == (2, 2):
+        tn, fp, fn, tp = cm.ravel()
+    else:
+        # Handle edge case where only one class is present
+        tn = fp = fn = tp = 0
+        if (y_true == 1).all():
+            tp = (y_pred == 1).sum()
+            fn = (y_pred == -1).sum()
+        elif (y_true == -1).all():
+            tn = (y_pred == -1).sum()
+            fp = (y_pred == 1).sum()
+    precision = precision_score(y_true, y_pred, pos_label=1, zero_division=0)
+    recall = recall_score(y_true, y_pred, pos_label=1, zero_division=0)
+    f1 = f1_score(y_true, y_pred, pos_label=1, zero_division=0)
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+    metrics = {
+        'accuracy': float(acc),
+        'f1_score': float(f1),
+        'precision': float(precision),
+        'recall': float(recall),
+        'specificity': float(specificity),
+        'false_positive_rate': float(fpr),
+        'true_positive': int(tp),
+        'false_positive': int(fp),
+        'true_negative': int(tn),
+        'false_negative': int(fn),
+    }
+    
+    if y_prob is not None:
+        y_binary = (y_true + 1) / 2  # Convert from {-1, 1} to {0, 1}
+        metrics['roc_auc'] = roc_auc_score(y_binary, y_prob)
+        metrics['average_precision'] = average_precision_score(y_binary, y_prob)
+    
+    return metrics
+    
+#### PLOTTING FUNCTIONS ####
+
+
+def plot_roc_curve(y_true, y_prob, save_path=None, show=True):
     """
     Plot ROC curve for edge sign prediction
     
@@ -90,11 +237,47 @@ def plot_roc_curve(y_true, y_prob, save_path=None):
     
     if save_path:
         plt.savefig(save_path)
-        print(f"ROC curve saved to {save_path}")
     
-    plt.show()
+    if show:
+        plt.show()
     
     return auc_score
+
+def plot_precision_recall(y_true, y_prob, save_path=None, show=True):
+    """
+    Plot Precision-Recall curve for edge sign prediction
+    
+    Parameters:
+    y_true: True edge signs
+    y_prob: Predicted probabilities for positive class
+    save_path: Path to save the image (optional)
+    show: Whether to display the plot (default: True)
+    
+    Returns:
+    pr_auc: Area under the Precision-Recall curve
+    """
+    # Convert labels to binary for PR calculation
+    y_binary = (np.array(y_true) + 1) / 2  # Convert from {-1, 1} to {0, 1}
+    y_prob = np.array(y_prob)
+    
+    precision, recall, _ = precision_recall_curve(y_binary, y_prob)
+    pr_auc = average_precision_score(y_binary, y_prob)
+    
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, color='purple', lw=2, label=f'PR curve (AP = {pr_auc:.3f})')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc='lower left')
+    plt.grid(alpha=0.3)
+    
+    if save_path:
+        plt.savefig(save_path)
+    
+    if show:
+        plt.show()
+    
+    return pr_auc
 
 def analyze_false_positives(G, edges, y_true, y_pred):
     """
@@ -119,7 +302,6 @@ def analyze_false_positives(G, edges, y_true, y_pred):
     fp_edges = [edges[i] for i in fp_indices]
     
     # Calculate embeddedness for false positive edges
-    import networkx as nx
     G_undirected = G.to_undirected()
     
     fp_embeddedness = []
@@ -161,6 +343,217 @@ def analyze_false_positives(G, edges, y_true, y_pred):
     plt.show()
     
     return analysis
+
+
+def plot_confusion_matrix(y_true, y_pred, save_path=None, show=True):
+    """
+    Plot confusion matrix visualization
+    
+    Parameters:
+    y_true: True edge signs
+    y_pred: Predicted edge signs
+    save_path: Path to save the image (optional)
+    """
+    # Print class distribution in the evaluation set for verification
+    unique, counts = np.unique(y_true, return_counts=True)
+    class_dist = dict(zip(unique, counts))
+    total = len(y_true)
+    print("Evaluation set class distribution:")
+    for cls, count in class_dist.items():
+        print(f"  Class {cls}: {count} edges ({count/total*100:.1f}%)")
+    
+    # Calculate confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    
+    # Calculate metrics
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0  # Recall
+    specificity = tn / (fp + tn) if (fp + tn) > 0 else 0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+    
+    # Get positive and negative counts for debugging
+    pos_true = np.sum(y_true == 1)
+    neg_true = np.sum(y_true == -1)
+    pos_ratio = pos_true / len(y_true)
+    
+    # Print warning if distribution differs from expected
+    if pos_ratio < 0.7:  # If less than 70% positive (expected 89%)
+        print(f"\nWARNING: Evaluation set has {pos_ratio:.1%} positive edges")
+        print(f"This differs from the expected 89% in the original dataset")
+        print(f"Positive: {pos_true}, Negative: {neg_true}, Total: {len(y_true)}")
+    
+    # Plot confusion matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+               xticklabels=['Negative', 'Positive'],
+               yticklabels=['Negative', 'Positive'])
+    plt.xlabel('Predicted Sign')
+    plt.ylabel('True Sign')
+    plt.title('Confusion Matrix')
+    
+    # Add dataset statistics and metrics for reference
+    plt.figtext(0.5, 0.01, 
+               f"Evaluation set: {pos_ratio:.1%} positive edges (Dataset: 89% positive)\n"
+               f"Sensitivity (Recall): {sensitivity:.3f}    "
+               f"Specificity: {specificity:.3f}    "
+               f"False Positive Rate: {fpr:.3f}",
+               ha="center", fontsize=10, bbox={"facecolor":"orange", "alpha":0.2})
+    
+    if save_path:
+        plt.savefig(save_path)
+    
+    if show:
+        plt.show()
+
+def plot_accuracy_vs_threshold(y_true, y_prob, thresholds=None, save_path=None, show=True):
+    """
+    Plot accuracy as a function of the decision threshold.
+    
+    Parameters:
+    y_true: True edge signs (numpy array or list)
+    y_prob: Predicted probabilities for positive class (numpy array or list)
+    thresholds: List or numpy array of thresholds to evaluate (default: np.linspace(0, 1, 101))
+    save_path: Path to save the image (optional)
+    """
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    
+    if thresholds is None:
+        thresholds = np.linspace(0, 1, 101)
+    accuracies = []
+    
+    for thresh in thresholds:
+        # Convert probabilities to predicted labels using threshold
+        y_pred = np.where(y_prob >= thresh, 1, -1)
+        acc = (y_pred == y_true).mean()
+        accuracies.append(acc)
+    
+    plt.figure(figsize=(8, 6))
+    plt.plot(thresholds, accuracies, marker='o', lw=2)
+    plt.xlabel('Threshold')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy vs. Threshold')
+    plt.grid(alpha=0.3)
+    plt.ylim(0, 1)
+    # Mark the best threshold
+    best_idx = np.argmax(accuracies)
+    plt.axvline(x=thresholds[best_idx], color='r', linestyle='--', label=f'Best: {thresholds[best_idx]:.2f} (Acc={accuracies[best_idx]:.3f})')
+    plt.legend()
+    if save_path:
+        plt.savefig(save_path)
+    
+    if show:
+        plt.show()
+
+def plot_f1_vs_threshold(y_true, y_prob, thresholds=None, save_path=None, show=True):
+    """
+    Plot F1 score as a function of the decision threshold.
+    
+    Parameters:
+    y_true: True edge signs (numpy array or list)
+    y_prob: Predicted probabilities for positive class (numpy array or list)
+    thresholds: List or numpy array of thresholds to evaluate (default: np.linspace(0, 1, 101))
+    save_path: Path to save the image (optional)
+    show: Whether to display the plot (default: True)
+    """
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    if thresholds is None:
+        thresholds = np.linspace(0, 1, 101)
+    f1_scores = []
+    for thresh in thresholds:
+        y_pred = np.where(y_prob >= thresh, 1, -1)
+        tp = np.sum((y_pred == 1) & (y_true == 1))
+        fp = np.sum((y_pred == 1) & (y_true == -1))
+        fn = np.sum((y_pred == -1) & (y_true == 1))
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        f1_scores.append(f1)
+    plt.figure(figsize=(8, 6))
+    plt.plot(thresholds, f1_scores, marker='o', lw=2)
+    plt.xlabel('Threshold')
+    plt.ylabel('F1 Score')
+    plt.title('F1 Score vs. Threshold')
+    plt.grid(alpha=0.3)
+    plt.ylim(0, 1)
+    best_idx = np.argmax(f1_scores)
+    plt.axvline(x=thresholds[best_idx], color='r', linestyle='--', label=f'Best: {thresholds[best_idx]:.2f} (F1={f1_scores[best_idx]:.3f})')
+    plt.legend()
+    if save_path:
+        plt.savefig(save_path)
+    
+    if show:
+        plt.show()
+
+def plot_calibration_curve(y_true, y_prob, n_bins=10, save_path=None, show=True):
+    """
+    Plot calibration curve (reliability diagram) for predicted probabilities.
+    
+    Parameters:
+    y_true: True edge signs (numpy array or list)
+    y_prob: Predicted probabilities for positive class (numpy array or list)
+    n_bins: Number of bins to use for calibration curve (default: 10)
+    save_path: Path to save the image (optional)
+    show: Whether to display the plot (default: True)
+    """
+    from sklearn.calibration import calibration_curve
+    y_true = np.array(y_true)
+    y_prob = np.array(y_prob)
+    # Convert labels to binary for calibration
+    y_binary = (y_true + 1) / 2  # {-1,1} -> {0,1}
+    prob_true, prob_pred = calibration_curve(y_binary, y_prob, n_bins=n_bins, strategy='uniform')
+    plt.figure(figsize=(8, 6))
+    plt.plot(prob_pred, prob_true, marker='o', label='Model')
+    plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Perfectly calibrated')
+    plt.xlabel('Mean Predicted Probability')
+    plt.ylabel('Fraction of Positives')
+    plt.title('Calibration Curve (Reliability Diagram)')
+    plt.legend(loc='upper left')
+    plt.grid(alpha=0.3)
+    if save_path:
+        plt.savefig(save_path)
+    
+    if show:
+        plt.show()
+
+
+def plot_feature_distributions_from_graph(G, save_path=None, k=4, show=False):
+    """
+    Extracts features from a NetworkX graph and plots the distribution of each feature in subplots.
+    All plots are saved in a single image.
+    Args:
+        G: NetworkX graph.
+        save_path: Path to save the image (optional).
+        k: Maximum cycle length for feature extraction (default: 4).
+        show: Whether to display the plot (default: False).
+    """
+    X, y, edge_list = feature_matrix_from_graph(G, k=k)
+    n_features = X.shape[1]
+    n_cols = min(4, n_features)
+    n_rows = int(np.ceil(n_features / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 3*n_rows))
+    axes = axes.flatten() if n_features > 1 else [axes]
+    for i in range(n_features):
+        ax = axes[i]
+        ax.hist(X[:, i], bins=30, alpha=0.7, color='tab:blue')
+        ax.set_title(f'Feature {i+1}')
+        ax.set_xlabel('Value')
+        ax.set_ylabel('Count')
+    # Hide unused subplots
+    for j in range(n_features, len(axes)):
+        axes[j].axis('off')
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path)
+    
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
+#### EVERYTHING BELOW THIS LINE IS DEPRECATED ####
+
 
 
 def remove_edges(X, y, edges, sampled_edges):
@@ -222,56 +615,7 @@ def cml_evaluation(model, X, y, edges, removed_edges, threshold=0.5):
     
     return results
 
-def plot_confusion_matrix(y_true, y_pred, save_path=None):
-    """
-    Plot confusion matrix visualization
-    
-    Parameters:
-    y_true: True edge signs
-    y_pred: Predicted edge signs
-    save_path: Path to save the image (optional)
-    """
-    # Print class distribution in the evaluation set for verification
-    unique, counts = np.unique(y_true, return_counts=True)
-    class_dist = dict(zip(unique, counts))
-    total = len(y_true)
-    print("Evaluation set class distribution:")
-    for cls, count in class_dist.items():
-        print(f"  Class {cls}: {count} edges ({count/total*100:.1f}%)")
-    
-    # Calculate confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-    
-    # Get positive and negative counts for debugging
-    pos_true = np.sum(y_true == 1)
-    neg_true = np.sum(y_true == -1)
-    pos_ratio = pos_true / len(y_true)
-    
-    # Print warning if distribution differs from expected
-    if pos_ratio < 0.7:  # If less than 70% positive (expected 89%)
-        print(f"\nWARNING: Evaluation set has {pos_ratio:.1%} positive edges")
-        print(f"This differs from the expected 89% in the original dataset")
-        print(f"Positive: {pos_true}, Negative: {neg_true}, Total: {len(y_true)}")
-    
-    # Plot confusion matrix
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-               xticklabels=['Negative', 'Positive'],
-               yticklabels=['Negative', 'Positive'])
-    plt.xlabel('Predicted Sign')
-    plt.ylabel('True Sign')
-    plt.title('Confusion Matrix')
-    
-    # Add dataset statistics for reference
-    plt.figtext(0.5, 0.01, 
-               f"Evaluation set: {pos_ratio:.1%} positive edges (Dataset: 89% positive)",
-               ha="center", fontsize=10, bbox={"facecolor":"orange", "alpha":0.2})
-    
-    if save_path:
-        plt.savefig(save_path)
-        print(f"Confusion matrix saved to {save_path}")
-    
-    plt.show()
+
 
 def cross_validate(X, y, model_func, n_splits=5, class_weight=None):
     """
@@ -338,7 +682,7 @@ def save_and_plot_results(all_y_true, all_y_pred, all_y_prob, evaluation_name, c
     """
     Convert results to arrays, evaluate, save, and plot.
     """
-
+    #TODO: delete this function
     # Convert to arrays
     all_y_true = np.array(all_y_true)
     all_y_pred = np.array(all_y_pred)
@@ -353,3 +697,72 @@ def save_and_plot_results(all_y_true, all_y_pred, all_y_prob, evaluation_name, c
                    save_path=os.path.join(results_dir, f'{evaluation_name}_roc_k{cycle_length}.png'))
     plot_confusion_matrix(all_y_true, all_y_pred,
                          save_path=os.path.join(results_dir, f'{evaluation_name}_cm_k{cycle_length}.png'))
+
+
+def save_run_results(true_labels, predicted_labels, predicted_probabilities, run_name="inductive_run", config=None):
+    """
+    Save evaluation results (labels, probabilities) to a new timestamped folder in the results directory in human-readable format.
+    Parameters:
+        true_labels: List of true edge labels
+        predicted_labels: List of predicted edge labels
+        predicted_probabilities: List of predicted probabilities
+        run_name: Prefix for the results directory name (default: "inductive_run")
+        config: Optional configuration dictionary
+    """
+    
+    results_dir = os.path.join('..', 'results', run_name, 'run_results')
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Save results as CSV files (human-readable)
+    with open(os.path.join(results_dir, 'true_labels.csv'), 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['true_label'])
+        for label in true_labels:
+            writer.writerow([label])
+    with open(os.path.join(results_dir, 'predicted_labels.csv'), 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['predicted_label'])
+        for label in predicted_labels:
+            writer.writerow([label])
+    with open(os.path.join(results_dir, 'predicted_probabilities.csv'), 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['predicted_probability'])
+        for prob in predicted_probabilities:
+            writer.writerow([prob])
+
+    # Save configuration as JSON if provided
+    if config is not None:
+        with open(os.path.join(results_dir, 'config.json'), 'w') as f:
+            json.dump(config, f, indent=2)
+
+    logging.info(f"Saved all results to {results_dir} (CSV/JSON format)")
+
+def load_run_results(results_dir):
+    """
+    Load evaluation results (labels, probabilities, config) from a results directory.
+    Parameters:
+        results_dir: Path to the results directory containing CSV/JSON files
+    Returns:
+        true_labels: Numpy array of true edge labels
+        predicted_labels: Numpy array of predicted edge labels
+        predicted_probabilities: Numpy array of predicted probabilities
+        config: Configuration dictionary (or None if not found)
+    """
+
+    def load_csv_column(filepath):
+        with open(filepath, 'r') as f:
+            reader = csv.reader(f)
+            next(reader)  # skip header
+            return [float(row[0]) for row in reader]
+
+    true_labels = np.array(load_csv_column(os.path.join(results_dir, 'true_labels.csv')))
+    predicted_labels = np.array(load_csv_column(os.path.join(results_dir, 'predicted_labels.csv')))
+    predicted_probabilities = np.array(load_csv_column(os.path.join(results_dir, 'predicted_probabilities.csv')), dtype=float)
+
+    config_path = os.path.join(results_dir, 'config.json')
+    config = None
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+    return true_labels, predicted_labels, predicted_probabilities, config

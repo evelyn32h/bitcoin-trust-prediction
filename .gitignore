@@ -16,3 +16,7 @@ Thumbs.db
 
 # Ignore pycache files
 __pycache__/
+
+.clj-kondo/
+
+.lsp/

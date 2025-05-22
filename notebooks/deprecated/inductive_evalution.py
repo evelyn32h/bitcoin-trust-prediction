@@ -2,12 +2,14 @@
 import random
 import sys
 import os
+import argparse
 
 from networkx import to_undirected
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import numpy as np
 import networkx as nx
+import pandas as pd
 from sklearn.model_selection import KFold
 import logging
 import time
@@ -19,7 +21,7 @@ from src.data_loader import load_bitcoin_data
 from src.preprocessing import filter_neutral_edges, map_to_unweighted_graph, ensure_connectivity, reindex_nodes, edge_bfs_holdout_split, sample_random_seed_edges
 from src.feature_extraction import feature_matrix_from_graph
 from src.models import train_edge_sign_classifier, predict_edge_signs, scale_training_features, scale_test_features
-from src.evaluation import evaluate_sign_predictor, save_and_plot_results
+from src.evaluation import evaluate_sign_predictor, save_and_plot_results, save_run_results
 
 # Set logging to reduce noise
 logging.basicConfig(level=logging.WARNING)
@@ -62,6 +64,13 @@ def evaluate_fold(args):
     X_train, y_train, _ = feature_matrix_from_graph(G_train, k=cycle_length)
     X_train_scaled, scaler = scale_training_features(X_train)
     model = train_edge_sign_classifier(X_train_scaled, y_train)
+    
+    # TODO remove this
+    # plotting features
+    X_test, y_test, _ = feature_matrix_from_graph(G_test, k=cycle_length)
+    # Save X_test to CSV using pandas DataFrame for better formatting
+    #pd.DataFrame(X_test).to_csv(f"fold_{fold}_X_test.csv", index=False)
+    
     
     # Sample subset of test edges to predict
     test_edges_sample = sample_edges_with_positive_ratio(G_test, sample_size=predictions_per_fold, pos_ratio=pos_edges_ratio)
@@ -184,6 +193,10 @@ def inductive_evaluation(G, n_folds=10, cycle_length=3, predictions_per_fold=20,
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run inductive evaluation and save results.")
+    parser.add_argument('--run_name', type=str, default="inductive", help="Name for the results directory (passed to save_run_results)")
+    args = parser.parse_args()
+
     # Load data
     data_path = os.path.join('..', 'data', 'soc-sign-bitcoinotc.csv')
     G, df = load_bitcoin_data(data_path)
@@ -203,10 +216,10 @@ def main():
     print("Running Inductive Evaluation...")
     
     evaluation_config = {
-        "n_folds": 4,
+        "n_folds": 5,
         "cycle_length": 4,
-        "predictions_per_fold": 300,
-        "pos_edges_ratio": 0.89
+        "predictions_per_fold": 200,
+        "pos_edges_ratio": 0.5
     }
     
     true_labels, predicted_labels, predicted_probabilities = inductive_evaluation(G, **evaluation_config)
@@ -220,8 +233,8 @@ def main():
         if isinstance(value, (int, float)):
             print(f"{key}: {value:.4f}")
     
-    # Save and plot results 
-    save_and_plot_results(true_labels, predicted_labels, predicted_probabilities, "inductive", evaluation_config["cycle_length"])     
-
+    # Save results
+    save_run_results(true_labels, predicted_labels, predicted_probabilities, args.run_name, evaluation_config)
+        
 if __name__ == "__main__":
     main()

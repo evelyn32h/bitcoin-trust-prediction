@@ -1,0 +1,21 @@
+# config.yaml
+# Global configuration for Bitcoin Trust Prediction project
+
+# all
+default_experiment_name: "experiment_1" # name of the experiment, used for saving results
+default_n_folds: 5 # number of validation sets
+cycle_length: 4 # length of HOC extracted as features
+
+# preprocessing
+data_path: "data/soc-sign-bitcoinotc.csv" # path data is loaded from
+num_test_edges: 4000 # nr edges in test set
+num_validation_edges: 4000 # nr edges in validation set
+
+# validation
+nr_val_predictions: 200 # nr edges predicted PER validation set
+pos_edges_ratio: 0.5 # rate of positive edges sampled for prediction
+
+# testing
+default_threshold: 0.5 # default threshold for classification
+threshold_type: "best_accuracy_threshold" # Options: "default_threshold" "best_accuracy_threshold" "best_f1_threshold"
+n_test_predictions: 300 # nr edges predicted in the test set

@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -45,7 +46,6 @@ def sample_edges_with_positive_ratio(G, sample_size, pos_ratio=0.5):
     if n_pos < orig_n_pos or n_neg < orig_n_neg:
         logger.warning(f"Requested {orig_n_pos} positive and {orig_n_neg} negative edges, but only {n_pos} positive and {n_neg} negative edges available.")
     
-    import random
     random.seed(42)
     pos_sample = random.sample(pos_edges, n_pos) if n_pos > 0 else []
     neg_sample = random.sample(neg_edges, n_neg) if n_neg > 0 else []
@@ -53,3 +53,23 @@ def sample_edges_with_positive_ratio(G, sample_size, pos_ratio=0.5):
     sample = pos_sample + neg_sample
     random.shuffle(sample)
     return sample
+
+def sample_n_edges(G, sample_size=None):
+    """
+    Sample a subset of edges from a NetworkX graph without enforcing a positive/negative ratio.
+    If sample_size is None, returns all edges. Otherwise, returns a random sample of the given size.
+    Prints and returns the number of positive and negative edges in the sample.
+    Returns:
+        list: Sampled list of (u, v, data) edge tuples.
+    """
+    import random
+    edge_list = list(G.edges(data=True))
+    if sample_size is not None and sample_size < len(edge_list):
+        random.seed(42)
+        sample = random.sample(edge_list, sample_size)
+    else:
+        sample = edge_list
+    pos_edges = [e for e in sample if e[2].get('weight', 1) > 0]
+    neg_edges = [e for e in sample if e[2].get('weight', 1) < 0]
+    print(f"Sampled {len(sample)} edges: {len(pos_edges)} positive, {len(neg_edges)} negative")
+    return sample, pos_edges, neg_edges
