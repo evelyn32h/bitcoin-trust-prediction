@@ -1,0 +1,36 @@
+# config.yaml
+# Global configuration for Bitcoin Trust Prediction project
+
+# Basic experiment settings
+default_experiment_name: "experiment_1" # name of the experiment, used for saving results
+default_n_folds: 5 # number of validation sets
+cycle_length: 4 # length of HOC extracted as features
+
+# Data and preprocessing settings
+data_path: "data/soc-sign-bitcoinotc.csv" # path data is loaded from
+num_test_edges: 4000 # nr edges in test set
+num_validation_edges: 4000 # nr edges in validation set
+
+# Validation settings
+nr_val_predictions: 200 # nr edges predicted PER validation set
+pos_edges_ratio: 0.5 # rate of positive edges sampled for prediction
+
+# Testing settings
+default_threshold: 0.5 # default threshold for classification
+threshold_type: "best_accuracy_threshold" # Options: "default_threshold" "best_accuracy_threshold" "best_f1_threshold"
+n_test_predictions: 300 # nr edges predicted in the test set
+
+# TASK #2: Bidirectional edge handling configuration 
+# Based on experiments, 'max' method achieves 90.67% accuracy vs 17.36% baseline
+bidirectional_method: 'max'  # Options: 'average', 'sum', 'max', 'min', 'first', 'stronger'
+
+# TASK #1: Weight feature configuration 
+# This enables the new weighted features vs original binary features
+use_weighted_features: false  # Set to true to enable weighted features (Task #1)
+weight_method: 'raw'  # Options: 'sign' (binary), 'raw' (preserve weights), 'binned' (discretized)
+weight_bins: 5  # Number of bins if using 'binned' method
+preserve_original_weights: true  # Whether to preserve original weights for analysis
+
+# Advanced feature extraction settings (Task #1 related)
+weighted_cycle_features: false  # Whether to use weight-aware cycle features
+weight_aggregation: 'product'  # How to aggregate weights in cycles: 'product', 'sum', 'mean', 'max'

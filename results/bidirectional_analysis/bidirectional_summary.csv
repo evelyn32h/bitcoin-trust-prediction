@@ -1,0 +1,9 @@
+metric,value
+total_edges,35592.0
+total_bidirectional_pairs,14100.0
+total_bidirectional_edges,28200.0
+bidirectional_ratio,0.7923128792987189
+sign_consistency_rate,0.9746099290780141
+avg_weight_difference,0.7890070921985816
+max_weight_difference,20.0
+weight_correlation,0.61886848145151
