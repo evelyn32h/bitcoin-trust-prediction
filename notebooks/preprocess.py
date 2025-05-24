@@ -15,9 +15,9 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
     
 from src.data_loader import load_bitcoin_data, save_graph_to_csv, save_config
-from src.preprocessing import (map_to_unweighted_graph, ensure_connectivity, to_undirected, reindex_nodes, 
-                              edge_bfs_holdout_split, sample_random_seed_edges, to_undirected_with_bidirectional_handling,
-                              map_to_weighted_graph, handle_bidirectional_edges_weighted)
+from src.preprocessing import (label_edges, map_to_unweighted_graph, ensure_connectivity, to_undirected, reindex_nodes, 
+                              edge_bfs_holdout_split, sample_random_seed_edges, to_undirected,
+                              transform_weights, handle_bidirectional_edges_weighted)
 
 # Load config from YAML
 with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
@@ -88,31 +88,23 @@ def preprocess_graph(G, bidirectional_method='max', use_weighted_features=False,
     print(f"Weight method: {weight_method}")
     
     # Step 1: Process weights according to method
-    if use_weighted_features:
-        # Task #1: New weighted feature approach
-        G = map_to_weighted_graph(G, weight_method=weight_method, weight_bins=weight_bins)
-    else:
-        # Original binary approach (for comparison)
-        G = map_to_unweighted_graph(G)
-        
+    G = transform_weights(G, use_weighted_features=use_weighted_features, weight_method=weight_method, weight_bins=weight_bins)
     print(f"After weight processing: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-    
+        
     # Step 2: Ensure connectivity (keep largest weakly connected component)
     G = ensure_connectivity(G)
     print(f"After connectivity filtering: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     
     # Step 3: Handle bidirectional edges and convert to undirected
-    if use_weighted_features:
-        # Use weighted-aware bidirectional handling
-        G = handle_bidirectional_edges_weighted(G, method=bidirectional_method, 
-                                               preserve_weights=preserve_original_weights)[0]
-    else:
-        # Use original bidirectional handling
-        G = to_undirected_with_bidirectional_handling(G, method=bidirectional_method)
+    G = to_undirected(G, method=bidirectional_method, use_weighted_features=use_weighted_features,
+                     preserve_original_weights=preserve_original_weights)
         
     print(f"After bidirectional handling: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     
-    # Step 4: Reindex nodes to be sequential
+    # Step 4: Add labels (sign) to edges
+    G = label_edges(G)
+    
+    # Step 5: Reindex nodes to be sequential
     G = reindex_nodes(G)
     print(f"Final graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     

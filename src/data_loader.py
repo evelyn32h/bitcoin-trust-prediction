@@ -42,8 +42,8 @@ def load_undirected_graph_from_csv(filepath):
         G: NetworkX undirected graph
         df: DataFrame of the original data
     """
-    df = pd.read_csv(filepath, sep=',', header=None, names=['source', 'target', 'weight', 'time'])
-    G = nx.from_pandas_edgelist(df, source='source', target='target', edge_attr=['weight', 'time'], create_using=nx.Graph())
+    df = pd.read_csv(filepath, sep=',', header=None, names=['source', 'target', 'label', 'weight', 'time'])
+    G = nx.from_pandas_edgelist(df, source='source', target='target', edge_attr=['label', 'weight', 'time'], create_using=nx.Graph())
     return G, df
 
 def save_graph_to_csv(G, filepath):
@@ -52,14 +52,15 @@ def save_graph_to_csv(G, filepath):
     The order and field names match the original Bitcoin OTC dataset.
     """
     df = nx.to_pandas_edgelist(G)
-    # Rename columns to match original (TODO might not be necessary)
-    df = df.rename(columns={'source': 'source', 'target': 'target', 'weight': 'weight', 'time': 'time'})
     # Ensure 'rating' and 'time' columns exist and are in the correct order
     if 'rating' not in df:
         df['rating'] = None
     if 'time' not in df:
         df['time'] = None
-    df = df[['source', 'target', 'weight', 'time']]
+    if 'label' not in df:
+        df['label'] = None
+        
+    df = df[['source', 'target', 'label', 'weight', 'time']]
     df.to_csv(filepath, index=False, header=False)
 
 def save_model(model, scaler, out_dir, fold):

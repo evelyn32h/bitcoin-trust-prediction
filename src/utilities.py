@@ -52,6 +52,8 @@ def sample_edges_with_positive_ratio(G, sample_size, pos_ratio=0.5):
     
     sample = pos_sample + neg_sample
     random.shuffle(sample)
+    
+    print(f"Sampled {len(sample)} edges: {len(pos_edges)} positive, {len(neg_edges)} negative")
     return sample
 
 def sample_n_edges(G, sample_size=None):

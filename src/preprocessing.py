@@ -194,16 +194,16 @@ def create_balanced_dataset(G):
     
     return G_balanced
 
-def to_undirected(G):
-    """
-    Convert a directed graph to an undirected graph using NetworkX's to_undirected().
-    Parameters:
-        G: A NetworkX graph (typically DiGraph)
-    Returns:
-        An undirected version of G (NetworkX Graph)
-    """
-    #TODO: Handle assymetric relationships
-    return G.to_undirected()
+# def to_undirected(G):
+#     """
+#     Convert a directed graph to an undirected graph using NetworkX's to_undirected().
+#     Parameters:
+#         G: A NetworkX graph (typically DiGraph)
+#     Returns:
+#         An undirected version of G (NetworkX Graph)
+#     """
+#     #TODO: Handle assymetric relationships
+#     return G.to_undirected()
 
 def edge_random_holdout(G, n_edges, random_state=None):
     """
@@ -310,21 +310,42 @@ def sample_random_seed_edges(G, n=5, random_state=None):
 
 # TASK #1: NEW WEIGHTED FEATURE FUNCTIONS
 
-def map_to_weighted_graph(G, weight_method='raw', weight_bins=5):
+def label_edges(G):
     """
-    Convert weighted directed graph to processed weighted graph based on the specified method.
-    This is for Task #1 - implementing weighted features instead of binary features.
+    Label edges in the graph based on their weights.
+    Positive weights are labeled as 1, negative weights as -1, and zero weights as 0.
     
     Parameters:
-    G: Original weighted directed graph
-    weight_method: Method for processing weights
-        - 'sign': Convert to +1/-1 (original binary method)
-        - 'raw': Preserve original weights (new weighted method)
-        - 'binned': Discretize weights into bins
-    weight_bins: Number of bins if using 'binned' method
+    G: NetworkX DiGraph with 'weight' edge attribute
     
     Returns:
-    G_processed: Processed graph with weights according to method
+    G_labeled: Graph with 'label' edge attribute
+    """
+    G_labeled = G.copy()
+    
+    for u, v, data in G_labeled.edges(data=True):
+        weight = data['weight']
+        if weight > 0:
+            label = 1
+        elif weight < 0:
+            label = -1
+        else:
+            label = 0
+        data['label'] = label
+    
+    return G_labeled
+
+def transform_weights(G, use_weighted_features=True, weight_method='raw', weight_bins=5):
+    """
+    Transform edge weights for machine learning tasks.
+    
+    Parameters:
+    - G: NetworkX DiGraph with 'weight' and 'time' edge attributes
+    - weight_method: 'sign' (binary ±1), 'raw' (preserve weights), 'binned' (discretize)
+    - weight_bins: Number of bins for 'binned' method
+    
+    Returns:
+    - G_processed: Graph with transformed weights and preserved original data
     """
     print(f"Processing weights using method: {weight_method}")
     
@@ -333,18 +354,18 @@ def map_to_weighted_graph(G, weight_method='raw', weight_bins=5):
     
     G_processed = nx.DiGraph()
     
-    if weight_method == 'sign':
+    if (not use_weighted_features) or weight_method == 'sign':
         # Original binary method (Task #1 baseline for comparison)
         for u, v, data in G.edges(data=True):
             weight = data['weight']
             sign = 1 if weight > 0 else -1
-            G_processed.add_edge(u, v, weight=sign, time=data['time'], original_weight=weight)
+            G_processed.add_edge(u, v, weight=sign, original_weight=weight, time=data['time'])
             
     elif weight_method == 'raw':
         # New weighted method (Task #1 main implementation)
         for u, v, data in G.edges(data=True):
             weight = data['weight']
-            G_processed.add_edge(u, v, weight=weight, time=data['time'], original_weight=weight)
+            G_processed.add_edge(u, v, weight=weight, original_weight=weight, time=data['time'])
             
     elif weight_method == 'binned':
         # Discretized weighted method (Task #1 alternative)
@@ -362,7 +383,7 @@ def map_to_weighted_graph(G, weight_method='raw', weight_bins=5):
             
             # Convert bin index to weight value (centered in bin)
             bin_center = (bin_edges[bin_idx] + bin_edges[bin_idx + 1]) / 2
-            G_processed.add_edge(u, v, weight=bin_center, time=data['time'], original_weight=weight)
+            G_processed.add_edge(u, v, weight=bin_center, original_weight=weight, time=data['time'])
     
     else:
         raise ValueError(f"Unknown weight_method: {weight_method}")
@@ -372,9 +393,8 @@ def map_to_weighted_graph(G, weight_method='raw', weight_bins=5):
     print(f"  Nodes: {G_processed.number_of_nodes()}")
     print(f"  Edges: {G_processed.number_of_edges()}")
     
-    if weight_method != 'sign':
-        processed_weights = [data['weight'] for _, _, data in G_processed.edges(data=True)]
-        print(f"  Weight range: [{min(processed_weights):.3f}, {max(processed_weights):.3f}]")
+    processed_weights = [data['weight'] for _, _, data in G_processed.edges(data=True)]
+    print(f"  Weight range: [{min(processed_weights):.3f}, {max(processed_weights):.3f}]")
     
     return G_processed
 
@@ -522,7 +542,7 @@ def handle_bidirectional_edges_weighted(G, method='max', preserve_weights=True):
 
 # EXISTING BIDIRECTIONAL EDGE HANDLING FUNCTIONS (Task #2 - COMPLETED)
 
-def handle_bidirectional_edges(G, method='average'):
+def handle_bidirectional_edges_binary(G, method='average'):
     """
     Handle bidirectional edges in a directed graph by combining them into undirected edges.
     This addresses teacher feedback about asymmetric relationships and implements 
@@ -664,7 +684,7 @@ def handle_bidirectional_edges(G, method='average'):
     
     return G_undirected, stats
 
-def to_undirected_with_bidirectional_handling(G, method='average'):
+def to_undirected(G, method='average', use_weighted_features=True, preserve_original_weights=True):
     """
     Convert directed graph to undirected while properly handling bidirectional edges.
     This replaces the simple to_undirected() function with bidirectional edge handling.
@@ -680,7 +700,11 @@ def to_undirected_with_bidirectional_handling(G, method='average'):
     if not G.is_directed():
         return G  # Already undirected
     
-    G_undirected, stats = handle_bidirectional_edges(G, method=method)
+    # Use the weighted-aware bidirectional handling
+    if use_weighted_features:
+        G_undirected, stats = handle_bidirectional_edges_weighted(G, method=method, preserve_weights=preserve_original_weights)
+    else:
+        G_undirected, stats = handle_bidirectional_edges_binary(G, method=method)
     
     # Print impact analysis
     original_pos = sum(1 for _, _, d in G.edges(data=True) if d.get('weight', 0) > 0)

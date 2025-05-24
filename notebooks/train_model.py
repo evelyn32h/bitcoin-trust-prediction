@@ -55,7 +55,6 @@ def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, wei
     Now supports weighted features.
     """
     # Print some info about edge weights before reindexing
-    weights = [d.get('weight') for _, _, d in G_train.edges(data=True)]
     G_train = reindex_nodes(G_train)
     
     # Extract features with Task #1 support
@@ -65,6 +64,8 @@ def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, wei
         use_weighted_features=use_weighted_features,
         weight_aggregation=weight_aggregation
     )
+    
+    print(f"Unique labels in y_train: {pd.Series(y_train).unique()}")
     
     # Print stats about features and labels
     print(f"Feature matrix shape: {X_train.shape}")
@@ -117,7 +118,7 @@ def main():
 
     # Load experiment configuration (Task #1 support)
     exp_config = load_experiment_config(args.name)
-    use_weighted_features = exp_config.get('use_weighted_features', False)
+    use_weighted_features = exp_config.get('use_weighted_features', False) # TODO: should be program args
     weight_aggregation = exp_config.get('weight_aggregation', 'product')
     
     print(f"Configuration loaded:")

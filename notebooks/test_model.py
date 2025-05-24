@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from src.utilities import sample_n_edges
+from src.utilities import sample_edges_with_positive_ratio, sample_n_edges
 from src.data_loader import load_models, load_undirected_graph_from_csv, load_metrics, save_prediction_results, save_metrics, save_config
 from src.preprocessing import reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
@@ -31,6 +31,7 @@ CYCLE_LENGTH = config['cycle_length']
 DEFAULT_EXPERIMENT_NAME = config['default_experiment_name']
 THRESHOLD_TYPE = config.get('threshold_type', 'default_threshold')  # e.g., 'default_threshold', 'best_f1_threshold', 'best_accuracy_threshold'
 N_TEST_PREDICTIONS = config.get('n_test_predictions', 200)  # Number of test predictions to sample
+POS_TEST_EDGES_RATIO = config.get('pos_test_edges_ratio', 0.5)  # Ratio of positive edges in test set
 
 def load_test_set(test_path):
     G_test, _ = load_undirected_graph_from_csv(test_path)
@@ -62,7 +63,14 @@ def test_model_on_set(G_test, model, scaler, cycle_length, threshold, use_weight
     pred_start = time.time()
     
     # Sample a subset of edges to predict
-    test_edges_sample, _, _ = sample_n_edges(G_test, sample_size=N_TEST_PREDICTIONS)
+    if POS_TEST_EDGES_RATIO > 0:
+        test_edges_sample = sample_edges_with_positive_ratio(
+            G_test, 
+            sample_size=N_TEST_PREDICTIONS,
+            pos_ratio=POS_TEST_EDGES_RATIO,
+        )
+    else:
+        test_edges_sample, _, _ = sample_n_edges(G_test, sample_size=N_TEST_PREDICTIONS)
     
     for idx, (u, v, data) in enumerate(test_edges_sample):
         edge_start = time.time()
