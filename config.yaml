@@ -2,23 +2,30 @@
 # Global configuration for Bitcoin Trust Prediction project
 
 # Basic experiment settings
-default_experiment_name: "experiment_1" # name of the experiment, used for saving results
+default_experiment_name: "vides_experiment_binary" # name of the experiment, used for saving results
 default_n_folds: 5 # number of validation sets
 cycle_length: 4 # length of HOC extracted as features
 
 # Data and preprocessing settings
 data_path: "data/soc-sign-bitcoinotc.csv" # path data is loaded from
-num_test_edges: 4000 # nr edges in test set
+num_test_edges: 5000 # nr edges in test set
 num_validation_edges: 4000 # nr edges in validation set
+
+# Training settings
+min_train_embeddedness: 1 # minimum embeddedness for training edges, comment out to disable
+#pos_train_edges_ratio: 0.5 # rate of positive edges sampled for training set, comment out to disable
 
 # Validation settings
 nr_val_predictions: 200 # nr edges predicted PER validation set
+min_val_embeddedness: 1 # minimum embeddedness for validation edges
 pos_edges_ratio: 0.5 # rate of positive edges sampled for prediction
 
 # Testing settings
 default_threshold: 0.5 # default threshold for classification
 threshold_type: "best_accuracy_threshold" # Options: "default_threshold" "best_accuracy_threshold" "best_f1_threshold"
 n_test_predictions: 300 # nr edges predicted in the test set
+min_test_embeddedness: 1 # minimum embeddedness for test , comment out to disable
+#pos_test_edges_ratio: 0.5 # rate of positive edges sampled for test set, comment out to disable
 
 # TASK #2: Bidirectional edge handling configuration 
 # Based on experiments, 'max' method achieves 90.67% accuracy vs 17.36% baseline

@@ -101,7 +101,7 @@ def calculate_best_f1_threshold(y_true, y_prob, thresholds=None):
         thresholds = np.linspace(0, 1, 101)
     best_f1 = -np.inf
     best_threshold = 0.5
-    f1_scores = []
+    f1_scores = {}
     for thresh in thresholds:
         y_pred = np.where(y_prob_filtered >= thresh, 1, -1)
         tp = np.sum((y_pred == 1) & (y_true_filtered == 1))
@@ -110,11 +110,11 @@ def calculate_best_f1_threshold(y_true, y_prob, thresholds=None):
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-        f1_scores.append(f1)
+        f1_scores[thresh] = f1
         if f1 > best_f1:
             best_f1 = f1
             best_threshold = thresh
-    return best_threshold, best_f1, thresholds, f1_scores
+    return best_threshold, best_f1, f1_scores
 
 def calculate_best_accuracy_threshold(y_true, y_prob, thresholds=None):
     """
@@ -140,15 +140,15 @@ def calculate_best_accuracy_threshold(y_true, y_prob, thresholds=None):
         thresholds = np.linspace(0, 1, 101)
     best_acc = -np.inf
     best_threshold = 0.5
-    acc_scores = []
+    acc_scores = {}
     for thresh in thresholds:
         y_pred = np.where(y_prob_filtered >= thresh, 1, -1)
         acc = (y_pred == y_true_filtered).mean()
-        acc_scores.append(acc)
+        acc_scores[thresh] = acc
         if acc > best_acc:
             best_acc = acc
             best_threshold = thresh
-    return best_threshold, best_acc, thresholds, acc_scores
+    return best_threshold, best_acc, acc_scores
 
 def calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, default_threshold=None):
     """
@@ -189,8 +189,8 @@ def calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, defaul
     print(f"Evaluation metrics: using {len(y_true_filtered)} valid samples from {len(y_true)} total")
     
     # Check if we have both classes
-    if len(np.unique(y_true_filtered)) < 2:
-        print("Warning: Only one class present in evaluation data")
+    if len(np.unique(y_true_filtered)) != 2:
+        print("Warning: Number of classes in evaluation data is not 2")
         return {
             'default_threshold': default_threshold,
             'best_f1_threshold': 0.5,
@@ -202,8 +202,8 @@ def calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, defaul
         }
     
     # find best threshold values
-    best_f1_thresh, best_f1, _, _ = calculate_best_f1_threshold(y_true_filtered, y_prob_filtered, thresholds)
-    best_acc_thresh, best_acc, _, _ = calculate_best_accuracy_threshold(y_true_filtered, y_prob_filtered, thresholds)
+    best_f1_thresh, best_f1, f1_scores = calculate_best_f1_threshold(y_true_filtered, y_prob_filtered, thresholds)
+    best_acc_thresh, best_acc, acc_scores = calculate_best_accuracy_threshold(y_true_filtered, y_prob_filtered, thresholds)
     
     # threshold independent metrics
     try:
@@ -217,6 +217,8 @@ def calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, defaul
     
     return {
         'default_threshold': default_threshold,
+        'default_f1': f1_scores.get(default_threshold, 0.0),
+        'default_accuracy': acc_scores.get(default_threshold, 0.0),
         'best_f1_threshold': best_f1_thresh,
         'best_f1': best_f1,
         'best_accuracy_threshold': best_acc_thresh,
@@ -224,6 +226,8 @@ def calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, defaul
         'roc_auc': roc_auc,
         'average_precision': average_precision,
     }
+    
+
     
 def calculate_test_metrics(y_true, y_pred, y_prob=None):
     """
@@ -1005,3 +1009,128 @@ def load_run_results(results_dir):
             config = json.load(f)
 
     return true_labels, predicted_labels, predicted_probabilities, config
+
+def calculate_comparative_evaluation_metrics(y_true, y_pred, y_prob, thresholds=None, default_threshold=None, random_seed=42):
+    """
+    Calculate evaluation metrics comparing actual predictions against random and all-positive baselines.
+    
+    Parameters:
+    y_true: True edge signs
+    y_pred: Predicted edge signs
+    y_prob: Predicted probabilities for positive class
+    thresholds: Optional thresholds to evaluate
+    default_threshold: Default threshold for evaluation
+    random_seed: Random seed for reproducible random predictions
+    
+    Returns:
+    Dictionary containing metrics for actual, random, and all-positive predictions
+    """
+    # Set random seed for reproducibility
+    np.random.seed(random_seed)
+    
+    # Convert to numpy arrays
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    y_prob = np.array(y_prob)
+    
+    # 1. Calculate metrics with actual predictions (full optimization)
+    actual_metrics = calculate_evaluation_metrics(y_true, y_pred, y_prob, thresholds, default_threshold)
+    
+    # 2. Generate random predictions and calculate simple metrics
+    random_pred_prob = np.random.random(len(y_true))
+    random_pred_binary = np.where(random_pred_prob >= 0.5, 1, -1)
+    
+    # Calculate simple metrics for random baseline without threshold optimization
+    random_metrics = calculate_evaluation_metrics(y_true, random_pred_binary, random_pred_prob, thresholds, default_threshold)
+    
+    # 3. Generate all-positive predictions and calculate simple metrics
+    all_positive_pred = np.ones(len(y_true), dtype=int)  # All predictions are positive (1)
+    all_positive_prob = np.ones(len(y_true))  # All probabilities are 1.0
+    
+    all_positive_metrics = calculate_evaluation_metrics(y_true, all_positive_pred, all_positive_prob, thresholds, default_threshold)
+    
+    # Aggregate results
+    comparative_results = {
+        'actual': actual_metrics,
+        'random_baseline': random_metrics,
+        'all_positive_baseline': all_positive_metrics,
+        'comparison': {
+            'actual_vs_random_f1_improvement': actual_metrics['best_f1'] - random_metrics['best_f1'],
+            'actual_vs_random_accuracy_improvement': actual_metrics['best_accuracy'] - random_metrics['best_accuracy'],
+            'actual_vs_random_roc_auc_improvement': actual_metrics['roc_auc'] - random_metrics['roc_auc'],
+            'actual_vs_all_positive_f1_improvement': actual_metrics['best_f1'] - all_positive_metrics['best_f1'],
+            'actual_vs_all_positive_accuracy_improvement': actual_metrics['best_accuracy'] - all_positive_metrics['best_accuracy'],
+            'actual_vs_all_positive_roc_auc_improvement': actual_metrics['roc_auc'] - all_positive_metrics['roc_auc'],
+        }
+    }
+    
+    return comparative_results
+
+def calculate_comparative_test_metrics(y_true, y_pred, y_prob=None, random_seed=42):
+    """
+    Calculate test metrics comparing actual predictions against random and all-positive baselines.
+    
+    This function is similar to calculate_comparative_evaluation_metrics but uses calculate_test_metrics
+    instead of calculate_evaluation_metrics, providing simpler metrics without threshold optimization.
+    
+    Parameters:
+    y_true: True edge signs
+    y_pred: Predicted edge signs
+    y_prob: Predicted probabilities for positive class (optional)
+    random_seed: Random seed for reproducible random predictions
+    
+    Returns:
+    Dictionary containing metrics for actual, random, and all-positive predictions
+    """
+    # Set random seed for reproducibility
+    np.random.seed(random_seed)
+    
+    # Convert to numpy arrays
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    if y_prob is not None:
+        y_prob = np.array(y_prob)
+    
+    # 1. Calculate metrics with actual predictions
+    actual_metrics = calculate_test_metrics(y_true, y_pred, y_prob)
+    
+    # 2. Generate random predictions and calculate metrics
+    random_pred_prob = np.random.random(len(y_true)) if y_prob is not None else None
+    random_pred_binary = np.where(np.random.random(len(y_true)) >= 0.5, 1, -1)
+    
+    # Calculate metrics for random baseline
+    random_metrics = calculate_test_metrics(y_true, random_pred_binary, random_pred_prob)
+    
+    # 3. Generate all-positive predictions and calculate metrics
+    all_positive_pred = np.ones(len(y_true), dtype=int)  # All predictions are positive (1)
+    all_positive_prob = np.ones(len(y_true)) if y_prob is not None else None  # All probabilities are 1.0
+    
+    all_positive_metrics = calculate_test_metrics(y_true, all_positive_pred, all_positive_prob)
+    
+    # Aggregate results
+    comparative_results = {
+        'actual': actual_metrics,
+        'random_baseline': random_metrics,
+        'all_positive_baseline': all_positive_metrics,
+        'comparison': {
+            'actual_vs_random_accuracy_improvement': actual_metrics['accuracy'] - random_metrics['accuracy'],
+            'actual_vs_random_f1_improvement': actual_metrics['f1_score'] - random_metrics['f1_score'],
+            'actual_vs_random_precision_improvement': actual_metrics['precision'] - random_metrics['precision'],
+            'actual_vs_random_recall_improvement': actual_metrics['recall'] - random_metrics['recall'],
+            'actual_vs_all_positive_accuracy_improvement': actual_metrics['accuracy'] - all_positive_metrics['accuracy'],
+            'actual_vs_all_positive_f1_improvement': actual_metrics['f1_score'] - all_positive_metrics['f1_score'],
+            'actual_vs_all_positive_precision_improvement': actual_metrics['precision'] - all_positive_metrics['precision'],
+            'actual_vs_all_positive_recall_improvement': actual_metrics['recall'] - all_positive_metrics['recall'],
+        }
+    }
+    
+    # Add ROC AUC comparisons if probabilities were provided
+    if y_prob is not None:
+        comparative_results['comparison'].update({
+            'actual_vs_random_roc_auc_improvement': actual_metrics.get('roc_auc', 0) - random_metrics.get('roc_auc', 0),
+            'actual_vs_random_avg_precision_improvement': actual_metrics.get('average_precision', 0) - random_metrics.get('average_precision', 0),
+            'actual_vs_all_positive_roc_auc_improvement': actual_metrics.get('roc_auc', 0) - all_positive_metrics.get('roc_auc', 0),
+            'actual_vs_all_positive_avg_precision_improvement': actual_metrics.get('average_precision', 0) - all_positive_metrics.get('average_precision', 0),
+        })
+    
+    return comparative_results

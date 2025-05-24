@@ -19,8 +19,8 @@ from src.data_loader import load_undirected_graph_from_csv, save_metrics, save_p
 from src.preprocessing import reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
 from src.models import predict_edge_signs, scale_test_features
-from src.evaluation import calculate_evaluation_metrics, evaluate_sign_predictor
-from src.utilities import sample_edges_with_positive_ratio
+from src.evaluation import calculate_comparative_evaluation_metrics, calculate_evaluation_metrics, evaluate_sign_predictor
+from src.utilities import print_comparative_evaluation_metrics, sample_edges_with_positive_ratio, sample_n_edges
 
 # Load config from YAML
 with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
@@ -70,7 +70,7 @@ def validate_model_on_fold(args):
     G_val = reindex_nodes(G_val)
 
     # Sample a subset of validation edges to predict, with a controlled positive/negative ratio
-    validation_edges_sample = sample_edges_with_positive_ratio(G_val, sample_size=predictions_per_fold, pos_ratio=pos_edges_ratio)
+    validation_edges_sample = sample_n_edges(G_val, sample_size=predictions_per_fold, min_embeddedness=config.get('min_val_embeddedness', None), pos_ratio=pos_edges_ratio)
 
     true_label, predicted_label, predicted_probabilities = [], [], []
     edge_times = []
@@ -187,12 +187,9 @@ def main():
     )
 
     # Compute and print evaluation metrics
-    metrics = calculate_evaluation_metrics(all_true_labels, all_predicted_labels, all_predicted_probabilities)
-    print("\nValidation Results")
-    for key, value in metrics.items():
-        if isinstance(value, (int, float)):
-            print(f"{key}: {value:.4f}")
-
+    metrics = calculate_comparative_evaluation_metrics(all_true_labels, all_predicted_labels, all_predicted_probabilities)
+    print_comparative_evaluation_metrics(metrics)
+    
     # Save results to output directory
     save_prediction_results(all_true_labels, all_predicted_labels, all_predicted_probabilities, out_dir)
     save_metrics(metrics, out_dir)

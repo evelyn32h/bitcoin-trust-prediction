@@ -115,29 +115,35 @@ def normalize_edge_weights(G):
 
 def filter_by_embeddedness(G, min_embeddedness=1):
     """
-    Filter edges by minimum embeddedness threshold
+    Filter edges by minimum embeddedness threshold using NetworkX's optimized common_neighbors function.
+    Assumes the graph is undirected for embeddedness calculation.
     
     Parameters:
-    G: NetworkX graph
+    G: NetworkX graph (assumes undirected)
     min_embeddedness: Minimum number of common neighbors required
     
     Returns:
-    G_filtered: Graph with filtered edges
+    G_filtered: Graph with filtered edges (same type as input)
     """
-    # Create a copy of the graph
-    G_filtered = nx.DiGraph()
+    # Create a copy with the same type as input
+    G_filtered = G.__class__()
+    G_filtered.add_nodes_from(G.nodes(data=True))
     
-    # Create undirected graph to calculate embeddedness
-    G_undirected = G.to_undirected()
+    # Print warning if graph is directed and convert to undirected for embeddedness calculation
+    if G.is_directed():
+        print("Warning: Graph is directed. Converting to undirected for embeddedness calculation.")
+        G_for_embeddedness = G.to_undirected()
+    else:
+        G_for_embeddedness = G
     
     # Filter edges based on embeddedness
     edges_kept = []
     for u, v, data in G.edges(data=True):
-        # Calculate embeddedness (number of common neighbors)
-        common_neighbors = set(G_undirected.neighbors(u)) & set(G_undirected.neighbors(v))
+        # Calculate embeddedness using NetworkX's optimized common_neighbors
+        embeddedness = len(list(nx.common_neighbors(G_for_embeddedness, u, v)))
         
         # Keep edge if embeddedness is at least min_embeddedness
-        if len(common_neighbors) >= min_embeddedness:
+        if embeddedness >= min_embeddedness:
             G_filtered.add_edge(u, v, **data)
             edges_kept.append((u, v))
     

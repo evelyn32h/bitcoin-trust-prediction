@@ -6,11 +6,13 @@ import networkx as nx
 import joblib
 import yaml
 
+
 # Add project root to sys.path for src imports
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from src.utilities import sample_n_edges
 from src.data_loader import load_bitcoin_data, load_undirected_graph_from_csv, save_model, save_config
 from src.preprocessing import map_to_unweighted_graph, ensure_connectivity, to_undirected, reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
@@ -57,9 +59,16 @@ def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, wei
     # Print some info about edge weights before reindexing
     G_train = reindex_nodes(G_train)
     
+    sampled_edges = sample_n_edges(G_train,
+        pos_ratio = config.get('pos_train_edges_ratio', None),
+        min_embeddedness = config.get('min_train_embeddedness', None),
+        strict=True
+    )
+    
     # Extract features with Task #1 support
     X_train, y_train, _ = feature_matrix_from_graph(
         G_train, 
+        edges=sampled_edges,
         k=cycle_length,
         use_weighted_features=use_weighted_features,
         weight_aggregation=weight_aggregation
