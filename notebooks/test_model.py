@@ -15,12 +15,12 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from src.utilities import sample_edges_with_positive_ratio, sample_n_edges
+from src.utilities import print_comparative_test_metrics, sample_edges_with_positive_ratio, sample_n_edges
 from src.data_loader import load_models, load_undirected_graph_from_csv, load_metrics, save_prediction_results, save_metrics, save_config
 from src.preprocessing import reindex_nodes
 from src.feature_extraction import feature_matrix_from_graph
 from src.models import predict_edge_signs, scale_test_features
-from src.evaluation import calculate_evaluation_metrics, calculate_test_metrics
+from src.evaluation import calculate_comparative_test_metrics, calculate_evaluation_metrics, calculate_test_metrics
 
 # Load config from YAML
 with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
@@ -63,14 +63,14 @@ def test_model_on_set(G_test, model, scaler, cycle_length, threshold, use_weight
     pred_start = time.time()
     
     # Sample a subset of edges to predict
-    if POS_TEST_EDGES_RATIO > 0:
-        test_edges_sample = sample_edges_with_positive_ratio(
-            G_test, 
-            sample_size=N_TEST_PREDICTIONS,
-            pos_ratio=POS_TEST_EDGES_RATIO,
-        )
-    else:
-        test_edges_sample, _, _ = sample_n_edges(G_test, sample_size=N_TEST_PREDICTIONS)
+
+    test_edges_sample = sample_n_edges(
+        G_test, 
+        sample_size=N_TEST_PREDICTIONS,
+        pos_ratio=config.get('pos_test_edges_ratio', None),
+        min_embeddedness=config.get('min_test_embeddedness', None)
+    )
+    
     
     for idx, (u, v, data) in enumerate(test_edges_sample):
         edge_start = time.time()
@@ -150,7 +150,7 @@ def main():
     metrics = load_metrics(validation_metrics_path)
 
     # Select threshold
-    threshold = metrics.get(args.threshold_type, 0.5)
+    threshold = metrics['actual'].get(args.threshold_type, 0.5)
     print(f"Using threshold {threshold} (type: {args.threshold_type})")
     print(f"Task #1 settings: weighted_features={use_weighted_features}, aggregation={weight_aggregation}")
 
@@ -164,11 +164,8 @@ def main():
     )
 
     # Compute and print evaluation metrics
-    test_metrics = calculate_test_metrics(y_true, y_pred, y_prob)
-    print("\nTest Results")
-    for key, value in test_metrics.items():
-        if isinstance(value, (int, float)):
-            print(f"{key}: {value:.4f}")
+    test_metrics = calculate_comparative_test_metrics(y_true, y_pred, y_prob)
+    print_comparative_test_metrics(test_metrics)
 
     # Save results
     save_prediction_results(y_true, y_pred, y_prob, out_dir)

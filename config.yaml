@@ -1,18 +1,19 @@
 # Configuration file for Bitcoin Trust Prediction Project
-# COMMUNITY DETECTION EPINIONS EXPERIMENT
+# MERGED VERSION: Combined community detection + Vide's embeddedness filtering
+# Compatible with both your methods and Vide's improvements
 
 # Dataset Configuration
 data_path: data/soc-sign-epinions.txt
 
 # Experiment naming
-default_experiment_name: experiment_epinions_community
+default_experiment_name: experiment_epinions_final
 
 # Cross-validation settings
 default_n_folds: 5
 
 # Data splitting settings
-num_test_edges: 4000
-num_validation_edges: 2500
+num_test_edges: 3500
+num_validation_edges: 2000
 
 # Feature extraction settings
 cycle_length: 4
@@ -20,13 +21,19 @@ cycle_length: 4
 # Model training settings
 default_threshold: 0.5
 
+# Training settings (Vide's additions)
+min_train_embeddedness: 1
+# pos_train_edges_ratio: 0.5  # Commented out to disable, use -1 to disable
+
 # Validation settings
-nr_val_predictions: 600
+nr_val_predictions: 500
+min_val_embeddedness: 1
 pos_edges_ratio: 0.5
 
 # Testing settings
 threshold_type: best_accuracy_threshold
 n_test_predictions: 800
+min_test_embeddedness: 1
 pos_test_edges_ratio: 0.5
 
 # Task 1: Weighted Features Configuration
@@ -39,10 +46,10 @@ weight_aggregation: product
 # Task 2: Bidirectional Edge Handling
 bidirectional_method: max
 
-# Community Detection Subset Sampling Configuration
+# Community Detection Subset Sampling Configuration (Your contribution)
 enable_subset_sampling: true
-subset_sampling_method: community_detection
-target_edge_count: 40000
+subset_sampling_method: time_based  # Options: time_based, community_detection, random, high_degree
+target_edge_count: 35000
 subset_preserve_structure: true
 
 # Optional settings
