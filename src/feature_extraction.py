@@ -305,8 +305,11 @@ def feature_matrix_from_graph(G, edges=None, k=4, use_weighted_features=False, w
     logger.info(f"Feature matrix shape: {len(X)} rows, {len(X[0]) if X else 0} columns")
     logger.debug(f"Feature matrix sample values: {X[:5] if len(X) > 5 else X}")
     
-    if not np.all(np.isin(y, [-1, 1])):
-        logger.warning("Label vector y contains values other than -1 or +1.")
+    # Check for outlying values in label vector
+    y_array = np.array(y)
+    if not np.all(np.isin(y_array, [-1, 1])):
+        outlying_values = np.unique(y_array[~np.isin(y_array, [-1, 1])])
+        logger.warning(f"Label vector y contains values other than -1 or +1: {outlying_values}")
     
     if use_weighted_features:
         logger.info(f"Task #1: Successfully extracted weighted features using {weight_aggregation} aggregation")

@@ -1,5 +1,5 @@
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, MaxAbsScaler
 import numpy as np
 
 def train_edge_sign_classifier(X, y):
@@ -54,16 +54,23 @@ def print_model_info(model):
     else:
         print("Model does not have accessible coefficients or intercept.")
 
-def scale_training_features(X_train):
+def scale_training_features(X_train, scaler_type='standard'):
     """
-    Fit a StandardScaler on training features and return the scaler and scaled features.
+    Fit a scaler on training features and return the scaler and scaled features.
     
     Parameters:
         X_train (array-like): Training feature matrix.
+        scaler_type (str): Type of scaler ('standard', 'robust', 'maxabs')
     Returns:
         tuple: (X_train_scaled, scaler)
     """
-    scaler = StandardScaler()
+    if scaler_type == 'robust':
+        scaler = RobustScaler()  # Best for outliers and extreme values
+    elif scaler_type == 'maxabs':
+        scaler = MaxAbsScaler()  # Best for sparse data with many zeros
+    else:
+        scaler = StandardScaler()  # Default
+    
     X_train_scaled = scaler.fit_transform(X_train)
     return X_train_scaled, scaler
 

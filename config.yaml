@@ -2,7 +2,7 @@
 # Global configuration for Bitcoin Trust Prediction project
 
 # Basic experiment settings
-default_experiment_name: "vides_experiment_binary" # name of the experiment, used for saving results
+default_experiment_name: "vides_experiment_weighted_k4" # name of the experiment, used for saving results
 default_n_folds: 5 # number of validation sets
 cycle_length: 4 # length of HOC extracted as features
 
@@ -39,5 +39,5 @@ weight_bins: 5  # Number of bins if using 'binned' method
 preserve_original_weights: true  # Whether to preserve original weights for analysis
 
 # Advanced feature extraction settings (Task #1 related)
-weighted_cycle_features: false  # Whether to use weight-aware cycle features
-weight_aggregation: 'product'  # How to aggregate weights in cycles: 'product', 'sum', 'mean', 'max'
+#weighted_cycle_features: false  # Whether to use weight-aware cycle features
+#weight_aggregation: 'product'  # How to aggregate weights in cycles: 'product', 'sum', 'mean', 'max'

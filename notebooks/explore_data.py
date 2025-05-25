@@ -1,176 +1,350 @@
+#!/usr/bin/env python3
+"""
+Bitcoin Trust Network Data Exploration Pipeline
+
+This script provides a command-line interface for exploring and analyzing the Bitcoin trust network data.
+It separates analysis functions from data saving concerns for better modularity.
+
+Usage:
+    python explore_data.py [--stages STAGES] [--output-dir OUTPUT_DIR] [--save-plots] [--save-metrics]
+
+Arguments:
+    --stages: Comma-separated list of analysis stages to run (default: all)
+              Options: network, weights, degrees, embeddedness, temporal, connectivity, preprocessing
+    --output-dir: Directory to save results (default: ../results/exploration)
+    --save-plots: Save generated plots to files
+    --save-metrics: Save calculated metrics to JSON files
+    
+Examples:
+    python explore_data.py --stages network,weights --save-plots
+    python explore_data.py --stages all --output-dir ../results/my_analysis --save-metrics
+    python explore_data.py --stages preprocessing --save-plots --save-metrics
+"""
+
+import argparse
 import sys
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import networkx as nx
-import pandas as pd
+from pathlib import Path
+
+import yaml
 
 # Add src directory to Python path
-sys.path.append(os.path.join('..'))
+# Add project root to sys.path for src imports
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-# Import custom modules
-from src.data_loader import load_bitcoin_data
-from src.preprocessing import map_to_unweighted_graph, ensure_connectivity
+# Load config from YAML
+with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
+    config = yaml.safe_load(f)
+    
+# Import analysis functions (separated from saving)
+from src.evaluation import (
+    # Network analysis functions
+    analyze_network,
+    calculate_embeddedness,
+    
+    # Visualization functions (now return metrics only)
+    visualize_weight_distribution,
+    visualize_degree_distribution, 
+    visualize_embeddedness,
+    analyze_temporal_patterns,
+    visualize_connectivity_analysis,
+    visualize_preprocessing_pipeline,
+)
 
-def analyze_network(G):
-    """
-    Calculate and return basic statistics of the network
-    
-    Parameters:
-    G: NetworkX graph
-    
-    Returns:
-    stats: Dictionary containing statistical information
-    """
-    stats = {}
-    
-    # Basic information
-    stats['num_nodes'] = G.number_of_nodes()
-    stats['num_edges'] = G.number_of_edges()
-    
-    # Edge weight analysis
-    weights = [data['weight'] for _, _, data in G.edges(data=True)]
-    stats['positive_edges'] = sum(1 for w in weights if w > 0)
-    stats['negative_edges'] = sum(1 for w in weights if w < 0)
-    stats['positive_ratio'] = stats['positive_edges'] / stats['num_edges']
-    
-    # Degree analysis
-    in_degrees = [d for n, d in G.in_degree()]
-    out_degrees = [d for n, d in G.out_degree()]
-    
-    stats['avg_in_degree'] = np.mean(in_degrees)
-    stats['max_in_degree'] = np.max(in_degrees)
-    stats['avg_out_degree'] = np.mean(out_degrees)
-    stats['max_out_degree'] = np.max(out_degrees)
-    
-    # Connectivity analysis
-    stats['weakly_connected_components'] = nx.number_weakly_connected_components(G)
-    largest_wcc = max(nx.weakly_connected_components(G), key=len)
-    stats['largest_wcc_size'] = len(largest_wcc)
-    stats['largest_wcc_ratio'] = stats['largest_wcc_size'] / stats['num_nodes']
-    
-    return stats
+# Import data handling functions
+from src.data_loader import load_bitcoin_data, save_metrics_to_json
+from src.preprocessing import (
+    map_to_unweighted_graph, 
+    ensure_connectivity, 
+    filter_neutral_edges, 
+    reindex_nodes
+)
 
-def visualize_weight_distribution(G, save_path=None):
-    """
-    Visualize distribution of edge weights
+def setup_output_directory(output_dir):
+    """Create output directory structure"""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
     
-    Parameters:
-    G: NetworkX graph
-    save_path: Path to save the image (optional)
-    """
-    weights = [data['weight'] for _, _, data in G.edges(data=True)]
+    # Create subdirectories for different types of outputs
+    plots_dir = output_path / "plots"
+    metrics_dir = output_path / "metrics"
     
-    plt.figure(figsize=(10, 6))
-    plt.hist(weights, bins=20, alpha=0.7)
-    plt.title('Edge Weight Distribution')
-    plt.xlabel('Weight')
-    plt.ylabel('Frequency')
-    plt.axvline(x=0, color='r', linestyle='--')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    plots_dir.mkdir(exist_ok=True)
+    metrics_dir.mkdir(exist_ok=True)
     
-    if save_path:
-        plt.savefig(save_path)
-        print(f"Figure saved to {save_path}")
-    
-    plt.show()
+    return output_path, plots_dir, metrics_dir
 
-def calculate_embeddedness(G):
-    """
-    Calculate embeddedness (number of shared neighbors) for each edge in the graph
+def run_network_analysis(G, output_path, save_plots, save_metrics):
+    """Run basic network analysis"""
+    print("\n" + "="*60)
+    print("STAGE 1: BASIC NETWORK ANALYSIS")
+    print("="*60)
     
-    Parameters:
-    G: NetworkX graph
+    # Analyze network structure
+    network_stats = analyze_network(G, "Bitcoin Trust Network")
     
-    Returns:
-    edge_embeddedness: Mapping from edges to their embeddedness values
-    """
-    # Create undirected graph to calculate shared neighbors
-    G_undirected = G.to_undirected()
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "network_analysis.json"
+        save_metrics_to_json(network_stats, str(metrics_file))
+        print(f"Network metrics saved to {metrics_file}")
     
-    # Calculate embeddedness for each edge
-    edge_embeddedness = {}
-    
-    for u, v in G.edges():
-        # Get shared neighbors
-        shared_neighbors = set(G_undirected.neighbors(u)) & set(G_undirected.neighbors(v))
-        edge_embeddedness[(u, v)] = len(shared_neighbors)
-    
-    return edge_embeddedness
+    return network_stats
 
-def visualize_embeddedness(G, save_path=None):
-    """
-    Visualize distribution of edge embeddedness
+def run_weight_analysis(G, output_path, save_plots, save_metrics):
+    """Run weight distribution analysis"""
+    print("\n" + "="*60)
+    print("STAGE 2: WEIGHT DISTRIBUTION ANALYSIS")
+    print("="*60)
     
-    Parameters:
-    G: NetworkX graph
-    save_path: Path to save the image (optional)
-    """
-    edge_embeddedness = calculate_embeddedness(G)
-    embeddedness_values = list(edge_embeddedness.values())
+    plot_path = None
+    if save_plots:
+        plot_path = str(output_path / "plots" / "weight_distribution.png")
     
-    plt.figure(figsize=(10, 6))
-    plt.hist(embeddedness_values, bins=20, alpha=0.7)
-    plt.title('Edge Embeddedness Distribution')
-    plt.xlabel('Embeddedness (Number of Common Neighbors)')
-    plt.ylabel('Frequency')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    weight_metrics = visualize_weight_distribution(G, save_path=plot_path, graph_name="Bitcoin Trust Network")
     
-    if save_path:
-        plt.savefig(save_path)
-        print(f"Figure saved to {save_path}")
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "weight_metrics.json"
+        save_metrics_to_json(weight_metrics, str(metrics_file))
+        print(f"Weight metrics saved to {metrics_file}")
     
-    plt.show()
+    return weight_metrics
+
+def run_degree_analysis(G, output_path, save_plots, save_metrics):
+    """Run degree distribution analysis"""
+    print("\n" + "="*60)
+    print("STAGE 3: DEGREE DISTRIBUTION ANALYSIS")
+    print("="*60)
     
-    # Calculate cumulative distribution
-    max_embed = max(embeddedness_values)
-    cum_dist = []
-    for i in range(max_embed + 1):
-        cum_dist.append(sum(1 for x in embeddedness_values if x <= i) / len(embeddedness_values))
+    plot_path = None
+    if save_plots:
+        plot_path = str(output_path / "plots" / "degree_distribution.png")
     
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(max_embed + 1), cum_dist, marker='o', linestyle='-')
-    plt.title('Cumulative Distribution of Edge Embeddedness')
-    plt.xlabel('Embeddedness Threshold')
-    plt.ylabel('Proportion of Edges')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    degree_metrics = visualize_degree_distribution(G, save_path=plot_path, graph_name="Bitcoin Trust Network")
     
-    if save_path:
-        base_name = os.path.splitext(save_path)[0]
-        cum_path = f"{base_name}_cumulative.png"
-        plt.savefig(cum_path)
-        print(f"Figure saved to {cum_path}")
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "degree_metrics.json"
+        save_metrics_to_json(degree_metrics, str(metrics_file))
+        print(f"Degree metrics saved to {metrics_file}")
     
-    plt.show()
+    return degree_metrics
+
+def run_embeddedness_analysis(G, output_path, save_plots, save_metrics):
+    """Run embeddedness analysis"""
+    print("\n" + "="*60)
+    print("STAGE 4: EMBEDDEDNESS ANALYSIS")
+    print("="*60)
+    
+    plot_path = None
+    if save_plots:
+        plot_path = str(output_path / "plots" / "embeddedness_distribution.png")
+    
+    edge_embeddedness, embeddedness_metrics = visualize_embeddedness(
+        G, save_path=plot_path, graph_name="Bitcoin Trust Network"
+    )
+    
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "embeddedness_metrics.json"
+        save_metrics_to_json(embeddedness_metrics, str(metrics_file))
+        print(f"Embeddedness metrics saved to {metrics_file}")
+    
+    return embeddedness_metrics
+
+def run_temporal_analysis(G, df, output_path, save_plots, save_metrics):
+    """Run temporal pattern analysis"""
+    print("\n" + "="*60)
+    print("STAGE 5: TEMPORAL ANALYSIS")
+    print("="*60)
+    
+    plot_path = None
+    if save_plots:
+        plot_path = str(output_path / "plots" / "temporal_patterns.png")
+    
+    temporal_metrics = analyze_temporal_patterns(G, df, save_path=plot_path)
+    
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "temporal_metrics.json"
+        save_metrics_to_json(temporal_metrics, str(metrics_file))
+        print(f"Temporal metrics saved to {metrics_file}")
+    
+    return temporal_metrics
+
+def run_connectivity_analysis(output_path, save_plots, save_metrics):
+    """Run connectivity analysis across preprocessing steps"""
+    print("\n" + "="*60)
+    print("STAGE 6: CONNECTIVITY ANALYSIS")
+    print("="*60)
+    
+    # Load and preprocess data to show connectivity changes
+    data_path = Path('..') / 'data' / 'soc-sign-bitcoinotc.csv'
+    if not data_path.exists():
+        data_path = Path('data') / 'soc-sign-bitcoinotc.csv'
+    
+    if not data_path.exists():
+        print(f"Error: Data file not found at {data_path}")
+        return {}
+    
+    # Load original data and create preprocessing steps
+    G_original, _ = load_bitcoin_data(str(data_path))
+    
+    graphs_dict = {
+        'Original': G_original,
+        'Filtered': filter_neutral_edges(G_original),
+    }
+    
+    # Add signed and connected versions
+    G_signed = map_to_unweighted_graph(graphs_dict['Filtered'])
+    G_connected = ensure_connectivity(G_signed)
+    G_final = reindex_nodes(G_connected)
+    
+    graphs_dict.update({
+        'Signed': G_signed,
+        'Connected': G_connected,
+        'Final': G_final
+    })
+    
+    plot_path = None
+    if save_plots:
+        plot_path = str(output_path / "plots" / "connectivity_analysis.png")
+    
+    connectivity_metrics = visualize_connectivity_analysis(graphs_dict, save_path=plot_path)
+    
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "connectivity_metrics.json"
+        save_metrics_to_json(connectivity_metrics, str(metrics_file))
+        print(f"Connectivity metrics saved to {metrics_file}")
+    
+    return connectivity_metrics
+
+def run_preprocessing_analysis(output_path, save_plots, save_metrics):
+    """Run complete preprocessing pipeline analysis"""
+    print("\n" + "="*60)
+    print("STAGE 7: PREPROCESSING PIPELINE ANALYSIS")
+    print("="*60)
+    
+    # Note: visualize_preprocessing_pipeline handles its own file saving
+    # We'll save additional summary metrics if requested
+    graphs, pipeline_stats = visualize_preprocessing_pipeline()
+    
+    if save_metrics:
+        metrics_file = output_path / "metrics" / "preprocessing_pipeline_metrics.json"
+        save_metrics_to_json(pipeline_stats, str(metrics_file))
+        print(f"Preprocessing pipeline metrics saved to {metrics_file}")
+    
+    return pipeline_stats
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Bitcoin Trust Network Data Exploration Pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__.split('\n\n', 1)[1]  # Show the usage examples
+    )
+    
+    parser.add_argument(
+        '--stages', 
+        type=str, 
+        default='all',
+        help='Comma-separated list of analysis stages to run. Options: network, weights, degrees, embeddedness, temporal, connectivity, preprocessing, all (default: all)'
+    )
+    
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default=f'./results/{config["default_experiment_name"]}/exploration',
+        help='Directory to save results (default: results/exploration)'
+    )
+    
+    parser.add_argument(
+        '--save-plots',
+        action='store_true',
+        default=True,
+        help='Save generated plots to files'
+    )
+    
+    parser.add_argument(
+        '--save-metrics',
+        action='store_true',
+        default=True,
+        help='Save calculated metrics to JSON files'
+    )
+    
+    args = parser.parse_args()
+    
+    # Parse stages
+    if args.stages.lower() == 'all':
+        stages = ['network', 'weights', 'degrees', 'embeddedness', 'temporal', 'connectivity', 'preprocessing']
+    else:
+        stages = [stage.strip().lower() for stage in args.stages.split(',')]
+    
+    # Validate stages
+    valid_stages = ['network', 'weights', 'degrees', 'embeddedness', 'temporal', 'connectivity', 'preprocessing']
+    invalid_stages = [stage for stage in stages if stage not in valid_stages]
+    if invalid_stages:
+        print(f"Error: Invalid stages: {invalid_stages}")
+        print(f"Valid stages: {valid_stages}")
+        return 1
+    
+    # Setup output directory
+    output_path, plots_dir, metrics_dir = setup_output_directory(args.output_dir)
+    print(f"Output directory: {output_path}")
+    if args.save_plots:
+        print(f"Plots will be saved to: {plots_dir}")
+    if args.save_metrics:
+        print(f"Metrics will be saved to: {metrics_dir}")
+    
+    # Load data for stages that need it
+    G, df = None, None
+    if any(stage in stages for stage in ['network', 'weights', 'degrees', 'embeddedness', 'temporal']):
+        data_path = Path('..') / 'data' / 'soc-sign-bitcoinotc.csv'
+        if not data_path.exists():
+            data_path = Path('data') / 'soc-sign-bitcoinotc.csv'
+        
+        if not data_path.exists():
+            print(f"Error: Data file not found at {data_path}")
+            return 1
+        
+        print(f"Loading data from {data_path}")
+        G, df = load_bitcoin_data(str(data_path))
+    
+    # Store all results
+    all_results = {}
+    
+    # Run selected stages
+    if 'network' in stages:
+        all_results['network'] = run_network_analysis(G, output_path, args.save_plots, args.save_metrics)
+    
+    if 'weights' in stages:
+        all_results['weights'] = run_weight_analysis(G, output_path, args.save_plots, args.save_metrics)
+    
+    if 'degrees' in stages:
+        all_results['degrees'] = run_degree_analysis(G, output_path, args.save_plots, args.save_metrics)
+    
+    if 'embeddedness' in stages:
+        all_results['embeddedness'] = run_embeddedness_analysis(G, output_path, args.save_plots, args.save_metrics)
+    
+    if 'temporal' in stages:
+        all_results['temporal'] = run_temporal_analysis(G, df, output_path, args.save_plots, args.save_metrics)
+    
+    if 'connectivity' in stages:
+        all_results['connectivity'] = run_connectivity_analysis(output_path, args.save_plots, args.save_metrics)
+    
+    if 'preprocessing' in stages:
+        all_results['preprocessing'] = run_preprocessing_analysis(output_path, args.save_plots, args.save_metrics)
+    
+    # Save summary of all results
+    if args.save_metrics and all_results:
+        summary_file = output_path / "metrics" / "exploration_summary.json"
+        save_metrics_to_json(all_results, str(summary_file))
+        print(f"\nComplete exploration summary saved to {summary_file}")
+    
+    print("\n" + "="*60)
+    print("DATA EXPLORATION COMPLETE")
+    print("="*60)
+    print(f"Stages completed: {', '.join(stages)}")
+    print(f"Results saved to: {output_path}")
+    
+    return 0
 
 if __name__ == "__main__":
-    # Load data
-    data_path = os.path.join('..', 'data', 'soc-sign-bitcoinotc.csv')
-    G, df = load_bitcoin_data(data_path)
-    
-    # Analyze network
-    print("\nNetwork Statistics:")
-    stats = analyze_network(G)
-    for key, value in stats.items():
-        print(f"{key}: {value}")
-    
-    # Visualize weight distribution
-    print("\nGenerating weight distribution visualization...")
-    results_dir = os.path.join('..', 'results')
-    os.makedirs(results_dir, exist_ok=True)
-    visualize_weight_distribution(G, os.path.join(results_dir, 'weight_distribution.png'))
-    
-    # Calculate and visualize embeddedness
-    print("\nCalculating and visualizing embeddedness...")
-    visualize_embeddedness(G, os.path.join(results_dir, 'embeddedness_distribution.png'))
-    
-    # Create signed graph and analyze
-    print("\nCreating signed graph...")
-    G_signed = map_to_unweighted_graph(G)
-    print("\nSigned Graph Statistics:")
-    signed_stats = analyze_network(G_signed)
-    for key, value in signed_stats.items():
-        print(f"{key}: {value}")
+    exit(main())
