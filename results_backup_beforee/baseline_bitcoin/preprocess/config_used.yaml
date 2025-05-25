@@ -1,0 +1,10 @@
+bidirectional_method: max
+data_path: data/soc-sign-bitcoinotc.csv
+experiment_name: baseline_bitcoin
+n_folds: 5
+num_test_edges: 2000
+num_validation_edges: 1000
+preserve_original_weights: true
+use_weighted_features: false
+weight_bins: 5
+weight_method: raw

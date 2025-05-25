@@ -1,0 +1,5 @@
+cycle_length: 4
+experiment_name: experiment_stronger
+n_folds: 5
+pos_edges_ratio: 0.5
+predictions_per_fold: 200

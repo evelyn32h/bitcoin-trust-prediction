@@ -6,7 +6,7 @@ import yaml
 import networkx as nx
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Set project root as working directory
+# Set project root as working directory (notebooks/ is current directory)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 os.chdir(PROJECT_ROOT)
 
@@ -19,7 +19,7 @@ from src.preprocessing import (label_edges, map_to_unweighted_graph, ensure_conn
                               edge_bfs_holdout_split, sample_random_seed_edges, to_undirected,
                               transform_weights, handle_bidirectional_edges_weighted)
 
-# Load config from YAML
+# Load config from YAML (from project root)
 with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
     config = yaml.safe_load(f)
 
@@ -29,6 +29,12 @@ DEFAULT_EXPERIMENT_NAME = config['default_experiment_name']
 DATA_PATH = config['data_path']
 N_TEST_EDGES = config['num_test_edges']
 N_VALIDATION_EDGES = config['num_validation_edges']
+
+# NEW: Subset sampling configuration
+ENABLE_SUBSET_SAMPLING = config.get('enable_subset_sampling', False)
+SUBSET_SAMPLING_METHOD = config.get('subset_sampling_method', 'time_based')
+TARGET_EDGE_COUNT = config.get('target_edge_count', 40000)
+SUBSET_PRESERVE_STRUCTURE = config.get('subset_preserve_structure', True)
 
 def create_splits(G, n_folds, n_test_edges, n_validation_edges):
     """
@@ -120,6 +126,12 @@ def main():
                        help="Enable weighted features (Task #1)")
     parser.add_argument('--weight_method', type=str, default=None,
                        help="Weight processing method: sign, raw, binned")
+    parser.add_argument('--enable_subset_sampling', action='store_true',
+                       help="Enable subset sampling for large datasets")
+    parser.add_argument('--subset_method', type=str, default=None,
+                       help="Subset sampling method: time_based, random, high_degree")
+    parser.add_argument('--target_edges', type=int, default=None,
+                       help="Target number of edges for subset sampling")
     args = parser.parse_args()
 
     # Load parameters from config or command line
@@ -129,14 +141,34 @@ def main():
     weight_bins = config.get('weight_bins', 5)
     preserve_original_weights = config.get('preserve_original_weights', True)
     
+    # Subset sampling parameters (command line args override config)
+    enable_subset_sampling = args.enable_subset_sampling or ENABLE_SUBSET_SAMPLING
+    subset_method = args.subset_method or SUBSET_SAMPLING_METHOD
+    target_edges = args.target_edges or TARGET_EDGE_COUNT
+    
     print(f"Task #1 Configuration:")
     print(f"  Using bidirectional edge handling method: {bidirectional_method}")
     print(f"  Using weighted features: {use_weighted_features}")
     print(f"  Weight method: {weight_method}")
     print(f"  Experiment name: {args.name}")
+    
+    if enable_subset_sampling:
+        print(f"Subset Sampling Configuration:")
+        print(f"  Enable subset sampling: {enable_subset_sampling}")
+        print(f"  Sampling method: {subset_method}")
+        print(f"  Target edge count: {target_edges}")
 
-    # Load data
-    G, df = load_bitcoin_data(DATA_PATH)
+    # Prepare subset configuration
+    subset_config = {
+        'subset_sampling_method': subset_method,
+        'target_edge_count': target_edges,
+        'subset_preserve_structure': SUBSET_PRESERVE_STRUCTURE
+    } if enable_subset_sampling else None
+
+    # Load data with optional subset sampling
+    G, df = load_bitcoin_data(DATA_PATH, 
+                             enable_subset_sampling=enable_subset_sampling, 
+                             subset_config=subset_config)
 
     # Preprocess with Task #1 weighted features support
     G = preprocess_graph(G, bidirectional_method=bidirectional_method,
@@ -148,8 +180,8 @@ def main():
     # Create splits
     G_test, splits = create_splits(G, N_FOLDS, N_TEST_EDGES, N_VALIDATION_EDGES)
     
-    # Save splits
-    out_dir = os.path.join('results', args.name, 'preprocess')
+    # Save splits to project root results directory
+    out_dir = os.path.join(PROJECT_ROOT, 'results', args.name, 'preprocess')
     save_splits(G_test, splits, out_dir)
     
     # Save config variables used using save_config
@@ -163,7 +195,11 @@ def main():
         'use_weighted_features': use_weighted_features,
         'weight_method': weight_method,
         'weight_bins': weight_bins,
-        'preserve_original_weights': preserve_original_weights
+        'preserve_original_weights': preserve_original_weights,
+        'enable_subset_sampling': enable_subset_sampling,
+        'subset_sampling_method': subset_method,
+        'target_edge_count': target_edges,
+        'subset_preserve_structure': SUBSET_PRESERVE_STRUCTURE
     }, out_dir)
 
 if __name__ == "__main__":
