@@ -1,0 +1,7 @@
+Run,Strategy,Percentile,Total_Edges,Pos_Ratio,Neg_Ratio,Distance_from_85%,Distance_from_93%,Nodes,Avg_Degree,Clustering,Connectivity
+5,random_high_degree,90,35000,0.8545,0.1455,0.0045,0.0755,9284,7.5399,0.0022,0.9893
+3,random_moderate_degree,80,35000,0.8579,0.1421,0.0079,0.0721,9765,7.1685,0.0016,0.9842
+1,random_moderate_degree,60,35000,0.8625,0.1375,0.0125,0.0675,9357,7.481,0.0008,0.9853
+2,random_moderate_degree,70,35000,0.8361,0.1639,0.0139,0.0939,8148,8.5911,0.0029,0.9888
+6,random_low_degree,30,35000,0.865,0.135,0.015,0.065,8732,8.0165,0.0,0.9935
+4,random_high_degree,85,35000,0.8284,0.1716,0.0216,0.1016,8776,7.9763,0.0033,0.9848

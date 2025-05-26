@@ -1,0 +1,260 @@
+[
+  {
+    "run_id": 1,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_moderate_degree",
+      "bfs_degree_percentile": 60
+    },
+    "strategy": {
+      "method": "random_moderate_degree",
+      "percentile": 60
+    },
+    "timing": {
+      "elapsed_seconds": 50.20833873748779
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 30188,
+      "negative_edges": 4812,
+      "zero_edges": 0,
+      "positive_ratio": 0.8625142857142857,
+      "negative_ratio": 0.1374857142857143,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.0125142857142857,
+      "distance_from_current": 0.06748571428571437
+    },
+    "network_statistics": {
+      "nodes": 9357,
+      "edges": 35000,
+      "avg_degree": 7.48103024473656,
+      "max_degree": 180,
+      "min_degree": 1,
+      "median_degree": 3.0,
+      "avg_clustering": 0.0008349206349206349,
+      "largest_cc_size": 9219,
+      "connectivity_ratio": 0.9852516832318051
+    },
+    "success": true
+  },
+  {
+    "run_id": 2,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_moderate_degree",
+      "bfs_degree_percentile": 70
+    },
+    "strategy": {
+      "method": "random_moderate_degree",
+      "percentile": 70
+    },
+    "timing": {
+      "elapsed_seconds": 40.357022762298584
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 29263,
+      "negative_edges": 5737,
+      "zero_edges": 0,
+      "positive_ratio": 0.8360857142857143,
+      "negative_ratio": 0.1639142857142857,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.013914285714285657,
+      "distance_from_current": 0.09391428571428573
+    },
+    "network_statistics": {
+      "nodes": 8148,
+      "edges": 35000,
+      "avg_degree": 8.59106529209622,
+      "max_degree": 215,
+      "min_degree": 1,
+      "median_degree": 3.0,
+      "avg_clustering": 0.0028593189857559227,
+      "largest_cc_size": 8057,
+      "connectivity_ratio": 0.988831615120275
+    },
+    "success": true
+  },
+  {
+    "run_id": 3,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_moderate_degree",
+      "bfs_degree_percentile": 80
+    },
+    "strategy": {
+      "method": "random_moderate_degree",
+      "percentile": 80
+    },
+    "timing": {
+      "elapsed_seconds": 33.177834033966064
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 30026,
+      "negative_edges": 4974,
+      "zero_edges": 0,
+      "positive_ratio": 0.8578857142857143,
+      "negative_ratio": 0.14211428571428572,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.007885714285714274,
+      "distance_from_current": 0.0721142857142858
+    },
+    "network_statistics": {
+      "nodes": 9765,
+      "edges": 35000,
+      "avg_degree": 7.168458781362007,
+      "max_degree": 286,
+      "min_degree": 1,
+      "median_degree": 3.0,
+      "avg_clustering": 0.0016035612535612532,
+      "largest_cc_size": 9611,
+      "connectivity_ratio": 0.9842293906810036
+    },
+    "success": true
+  },
+  {
+    "run_id": 4,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_high_degree",
+      "bfs_degree_percentile": 85
+    },
+    "strategy": {
+      "method": "random_high_degree",
+      "percentile": 85
+    },
+    "timing": {
+      "elapsed_seconds": 16.323867082595825
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 28993,
+      "negative_edges": 6007,
+      "zero_edges": 0,
+      "positive_ratio": 0.8283714285714285,
+      "negative_ratio": 0.17162857142857144,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.02162857142857144,
+      "distance_from_current": 0.10162857142857151
+    },
+    "network_statistics": {
+      "nodes": 8776,
+      "edges": 35000,
+      "avg_degree": 7.9762989972652685,
+      "max_degree": 198,
+      "min_degree": 1,
+      "median_degree": 3.0,
+      "avg_clustering": 0.0032959795321637424,
+      "largest_cc_size": 8643,
+      "connectivity_ratio": 0.984845031905196
+    },
+    "success": true
+  },
+  {
+    "run_id": 5,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_high_degree",
+      "bfs_degree_percentile": 90
+    },
+    "strategy": {
+      "method": "random_high_degree",
+      "percentile": 90
+    },
+    "timing": {
+      "elapsed_seconds": 16.215335845947266
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 29907,
+      "negative_edges": 5093,
+      "zero_edges": 0,
+      "positive_ratio": 0.8544857142857143,
+      "negative_ratio": 0.1455142857142857,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.004485714285714315,
+      "distance_from_current": 0.07551428571428576
+    },
+    "network_statistics": {
+      "nodes": 9284,
+      "edges": 35000,
+      "avg_degree": 7.539853511417492,
+      "max_degree": 218,
+      "min_degree": 1,
+      "median_degree": 3.0,
+      "avg_clustering": 0.0021871536273710183,
+      "largest_cc_size": 9185,
+      "connectivity_ratio": 0.9893364928909952
+    },
+    "success": true
+  },
+  {
+    "run_id": 6,
+    "config": {
+      "enable_subset_sampling": true,
+      "subset_sampling_method": "bfs_sampling",
+      "target_edge_count": 35000,
+      "subset_preserve_structure": true,
+      "bfs_max_iterations": 10000,
+      "bfs_tolerance": 0.1,
+      "bfs_seed_selection": "random_low_degree",
+      "bfs_degree_percentile": 30
+    },
+    "strategy": {
+      "method": "random_low_degree",
+      "percentile": 30
+    },
+    "timing": {
+      "elapsed_seconds": 16.242884874343872
+    },
+    "edge_statistics": {
+      "total_edges": 35000,
+      "positive_edges": 30276,
+      "negative_edges": 4724,
+      "zero_edges": 0,
+      "positive_ratio": 0.8650285714285715,
+      "negative_ratio": 0.13497142857142858,
+      "zero_ratio": 0.0,
+      "distance_from_85pct": 0.015028571428571502,
+      "distance_from_current": 0.06497142857142857
+    },
+    "network_statistics": {
+      "nodes": 8732,
+      "edges": 35000,
+      "avg_degree": 8.016491067338524,
+      "max_degree": 181,
+      "min_degree": 1,
+      "median_degree": 4.0,
+      "avg_clustering": 0.0,
+      "largest_cc_size": 8675,
+      "connectivity_ratio": 0.9934722858451672
+    },
+    "success": true
+  }
+]

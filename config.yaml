@@ -1,12 +1,11 @@
 # Configuration file for Bitcoin Trust Prediction Project
-# BALANCED EPINIONS EXPERIMENT - Using Vide's filtering feature
-# Goal: Test Epinions with balanced 80% positive / 20% negative ratio
+# BALANCED EPINIONS EXPERIMENT 
 
 # Dataset Configuration
-data_path: data/soc-sign-epinions.txt
+data_path: data/soc-sign-epinions-best-balance.txt
 
 # Experiment naming
-default_experiment_name: experiment_epinions_balanced
+default_experiment_name: experiment_epinions_optimal_balance
 
 # Cross-validation settings
 default_n_folds: 5
