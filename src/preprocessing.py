@@ -1,6 +1,8 @@
 import networkx as nx
 import numpy as np
 import random
+from collections import deque
+import time
 
 def map_to_unweighted_graph(G):
     """
@@ -200,16 +202,132 @@ def create_balanced_dataset(G):
     
     return G_balanced
 
-# def to_undirected(G):
-#     """
-#     Convert a directed graph to an undirected graph using NetworkX's to_undirected().
-#     Parameters:
-#         G: A NetworkX graph (typically DiGraph)
-#     Returns:
-#         An undirected version of G (NetworkX Graph)
-#     """
-#     #TODO: Handle assymetric relationships
-#     return G.to_undirected()
+def optimized_bfs_sampling(G, target_edges, seed_selection='random_moderate_degree', degree_percentile=70):
+    """
+    Optimized BFS sampling for large graphs following Vide's strategy.
+    Same method as used for Bitcoin OTC sampling but optimized for Epinions scale.
+    
+    Parameters:
+    G: NetworkX directed graph
+    target_edges: Target number of edges in the subset
+    seed_selection: Method to select seed node ('random_moderate_degree', 'random')
+    degree_percentile: Percentile for moderate degree selection (avoid highest degree)
+    
+    Returns:
+    G_subset: Subgraph with approximately target_edges edges
+    """
+    print(f"Starting optimized BFS sampling...")
+    print(f"Target: {target_edges} edges (same strategy as Bitcoin OTC)")
+    print(f"Seed selection: {seed_selection}")
+    
+    start_time = time.time()
+    
+    # Convert to undirected for BFS (preserves connectivity better)
+    if G.is_directed():
+        G_undirected = G.to_undirected()
+    else:
+        G_undirected = G
+    
+    # Select seed node based on strategy
+    if seed_selection == 'random_moderate_degree':
+        # Get degree distribution and select from moderate-degree nodes
+        # Avoid highest degree nodes as Vide suggested
+        degrees = dict(G_undirected.degree())
+        degree_values = list(degrees.values())
+        degree_threshold = np.percentile(degree_values, degree_percentile)
+        
+        # Select nodes with degree >= threshold but not the absolute highest
+        candidate_nodes = [node for node, deg in degrees.items() 
+                          if deg >= degree_threshold and deg < max(degree_values)]
+        
+        if not candidate_nodes:
+            # Fallback to all nodes if filtering is too strict
+            candidate_nodes = list(G_undirected.nodes())
+        
+        seed_node = random.choice(candidate_nodes)
+        seed_degree = degrees[seed_node]
+        print(f"Selected seed node {seed_node} with degree {seed_degree} (percentile: {degree_percentile})")
+        
+    else:  # random selection
+        seed_node = random.choice(list(G_undirected.nodes()))
+        print(f"Selected random seed node: {seed_node}")
+    
+    # Optimized BFS implementation
+    visited_nodes = set()
+    visited_edges = set()
+    queue = deque([seed_node])
+    visited_nodes.add(seed_node)
+    
+    print("Running BFS traversal...")
+    
+    # BFS with edge counting
+    while queue and len(visited_edges) < target_edges:
+        current_node = queue.popleft()
+        
+        # Get neighbors and process them
+        neighbors = list(G_undirected.neighbors(current_node))
+        
+        # Shuffle neighbors for randomness
+        random.shuffle(neighbors)
+        
+        for neighbor in neighbors:
+            if len(visited_edges) >= target_edges:
+                break
+                
+            # Add edge if not already counted
+            edge = tuple(sorted([current_node, neighbor]))
+            if edge not in visited_edges:
+                visited_edges.add(edge)
+                
+                # Add neighbor to queue if not visited
+                if neighbor not in visited_nodes:
+                    visited_nodes.add(neighbor)
+                    queue.append(neighbor)
+        
+        # Progress reporting
+        if len(visited_edges) % 5000 == 0:
+            elapsed = time.time() - start_time
+            print(f"  Progress: {len(visited_edges)}/{target_edges} edges, "
+                  f"{len(visited_nodes)} nodes, {elapsed:.1f}s")
+    
+    # Create subgraph from visited nodes
+    print("Creating subgraph from BFS result...")
+    subgraph_nodes = visited_nodes
+    
+    # Extract subgraph from original directed graph
+    G_subset = G.subgraph(subgraph_nodes).copy()
+    
+    # If we have more edges than target, randomly sample to exact target
+    if G_subset.number_of_edges() > target_edges:
+        print(f"Subgraph has {G_subset.number_of_edges()} edges, sampling to {target_edges}")
+        all_edges = list(G_subset.edges(data=True))
+        sampled_edges = random.sample(all_edges, target_edges)
+        
+        # Create new graph with sampled edges
+        G_final = G.__class__()
+        G_final.add_nodes_from(G_subset.nodes(data=True))
+        for u, v, data in sampled_edges:
+            G_final.add_edge(u, v, **data)
+        G_subset = G_final
+    
+    elapsed = time.time() - start_time
+    
+    print(f"BFS sampling completed in {elapsed:.1f} seconds:")
+    print(f"  Nodes selected: {G_subset.number_of_nodes()}")
+    print(f"  Edges selected: {G_subset.number_of_edges()}")
+    print(f"  Target achieved: {G_subset.number_of_edges() / target_edges:.1%}")
+    
+    # Analyze connectivity preservation
+    if G.is_directed():
+        original_components = nx.number_weakly_connected_components(G)
+        subset_components = nx.number_weakly_connected_components(G_subset)
+    else:
+        original_components = nx.number_connected_components(G)
+        subset_components = nx.number_connected_components(G_subset)
+    
+    print(f"  Connectivity: {subset_components} components (original: {original_components})")
+    
+    return G_subset
 
 def edge_random_holdout(G, n_edges, random_state=None):
     """

@@ -11,7 +11,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
     """
     Load dataset (Bitcoin OTC or Epinions) and convert to NetworkX directed weighted graph
     Auto-detects format based on file extension or content
-    Enhanced with community detection subset sampling support
+    Enhanced with BFS subset sampling support following Vide's strategy
     
     Parameters:
     filepath: Path to the data file
@@ -78,7 +78,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
 def apply_subset_sampling(df, subset_config):
     """
     Apply subset sampling to large datasets to make them comparable in size.
-    Enhanced with community detection method for preserving network structure.
+    Enhanced with BFS sampling method following Vide's strategy.
     
     Parameters:
     df: Full dataset DataFrame
@@ -94,8 +94,13 @@ def apply_subset_sampling(df, subset_config):
     print(f"Applying {sampling_method} sampling...")
     print(f"Target: ~{target_edge_count} edges (comparable to Bitcoin OTC)")
     
-    if sampling_method == 'community_detection':
-        # NEW: Community detection sampling - best for preserving network structure
+    if sampling_method == 'bfs_sampling':
+        # NEW: BFS sampling following Vide's strategy
+        df_subset = sample_by_bfs_method(df, target_edge_count, subset_config)
+        print(f"BFS sampling: {len(df_subset)} edges")
+        
+    elif sampling_method == 'community_detection':
+        # Community detection sampling - best for preserving network structure
         df_subset = sample_by_community_detection(df, target_edge_count)
         print(f"Community detection sampling: {len(df_subset)} edges")
         
@@ -145,6 +150,62 @@ def apply_subset_sampling(df, subset_config):
     print(f"  Subset: {len(df_subset)} edges, {subset_nodes} nodes")
     print(f"  Edge compression: {len(df_subset)/len(df):.3f}")
     print(f"  Node compression: {subset_nodes/original_nodes:.3f}")
+    
+    return df_subset
+
+def sample_by_bfs_method(df, target_edge_count, subset_config):
+    """
+    Apply BFS sampling following Vide's strategy.
+    Same method as used for Bitcoin OTC but optimized for large datasets.
+    
+    Parameters:
+    df: Original DataFrame
+    target_edge_count: Target number of edges
+    subset_config: Configuration dictionary with BFS settings
+    
+    Returns:
+    df_subset: Subset DataFrame from BFS sampling
+    """
+    from src.preprocessing import optimized_bfs_sampling
+    
+    print("Applying BFS sampling (same strategy as Bitcoin OTC)...")
+    
+    # Create graph from DataFrame
+    G = nx.DiGraph()
+    for _, row in df.iterrows():
+        G.add_edge(row['source'], row['target'], 
+                   weight=row['rating'], time=row['time'])
+    
+    print(f"Created graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+    
+    # Get BFS configuration
+    seed_selection = subset_config.get('bfs_seed_selection', 'random_moderate_degree')
+    degree_percentile = subset_config.get('bfs_degree_percentile', 70)
+    
+    # Apply BFS sampling
+    G_subset = optimized_bfs_sampling(
+        G, 
+        target_edge_count, 
+        seed_selection=seed_selection,
+        degree_percentile=degree_percentile
+    )
+    
+    # Convert back to DataFrame
+    subset_edges = []
+    for u, v, data in G_subset.edges(data=True):
+        subset_edges.append({
+            'source': u,
+            'target': v, 
+            'rating': data['weight'],
+            'time': data['time']
+        })
+    
+    df_subset = pd.DataFrame(subset_edges)
+    
+    print(f"BFS sampling completed:")
+    print(f"  Nodes: {G_subset.number_of_nodes()}")
+    print(f"  Edges: {len(df_subset)}")
+    print(f"  Target achievement: {len(df_subset)/target_edge_count:.1%}")
     
     return df_subset
 
@@ -654,7 +715,7 @@ def save_config(config_dict, out_dir, filename="config_used.yaml"):
     print(f"Saved config to {config_path}")
 
 if __name__ == "__main__":
-    # Test community detection sampling
+    # Test BFS sampling
     import sys
     if len(sys.argv) > 1:
         data_path = sys.argv[1]
@@ -669,11 +730,13 @@ if __name__ == "__main__":
         else:
             data_path = bitcoin_path
     
-    # Test with community detection sampling
+    # Test with BFS sampling (following Vide's strategy)
     subset_config = {
-        'subset_sampling_method': 'community_detection',
-        'target_edge_count': 40000,
-        'subset_preserve_structure': True
+        'subset_sampling_method': 'bfs_sampling',
+        'target_edge_count': 35000,
+        'subset_preserve_structure': True,
+        'bfs_seed_selection': 'random_moderate_degree',
+        'bfs_degree_percentile': 70
     }
     
     G, df = load_bitcoin_data(data_path, enable_subset_sampling=True, subset_config=subset_config)

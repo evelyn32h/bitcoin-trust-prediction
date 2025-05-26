@@ -1,56 +1,60 @@
 # Configuration file for Bitcoin Trust Prediction Project
-# MERGED VERSION: Combined community detection + Vide's embeddedness filtering
-# Compatible with both your methods and Vide's improvements
+# BALANCED EPINIONS EXPERIMENT - Using Vide's filtering feature
+# Goal: Test Epinions with balanced 80% positive / 20% negative ratio
 
 # Dataset Configuration
 data_path: data/soc-sign-epinions.txt
 
 # Experiment naming
-default_experiment_name: experiment_epinions_final
+default_experiment_name: experiment_epinions_balanced
 
 # Cross-validation settings
 default_n_folds: 5
 
-# Data splitting settings
-num_test_edges: 3500
-num_validation_edges: 2000
-
 # Feature extraction settings
 cycle_length: 4
+
+# Data splitting settings (EXACTLY MATCH Vide's)
+num_test_edges: 5000      # Match Vide: 5000
+num_validation_edges: 4000   # Match Vide: 4000
 
 # Model training settings
 default_threshold: 0.5
 
-# Training settings (Vide's additions)
+# Training settings (ENABLE Vide's filtering feature)
 min_train_embeddedness: 1
-# pos_train_edges_ratio: 0.5  # Commented out to disable, use -1 to disable
+pos_train_edges_ratio: 0.8  # ACTIVATE: 80% positive as in original Epinions
 
-# Validation settings
-nr_val_predictions: 500
+# Validation settings (ENABLE Vide's filtering feature)
+nr_val_predictions: 200     # Match Vide: 200
 min_val_embeddedness: 1
-pos_edges_ratio: 0.5
+pos_edges_ratio: 0.8       # ACTIVATE: 80% positive for balanced validation
 
-# Testing settings
+# Testing settings (ENABLE Vide's filtering feature)
 threshold_type: best_accuracy_threshold
-n_test_predictions: 800
+n_test_predictions: 300     # Match Vide: 300
 min_test_embeddedness: 1
-pos_test_edges_ratio: 0.5
+pos_test_edges_ratio: 0.8   # ACTIVATE: 80% positive for balanced testing
 
-# Task 1: Weighted Features Configuration
-use_weighted_features: false
-weight_method: sign
+# Task 1: Weighted Features Configuration (EXACTLY MATCH Vide's)
+use_weighted_features: false  # Match Vide: unweighted for fair comparison
+weight_method: raw
 weight_bins: 5
 preserve_original_weights: true
-weight_aggregation: product
 
-# Task 2: Bidirectional Edge Handling
+# Task 2: Bidirectional Edge Handling (EXACTLY MATCH Vide's)
 bidirectional_method: max
 
-# Community Detection Subset Sampling Configuration (Your contribution)
+# BFS SAMPLING CONFIGURATION
+# Apply BFS sampling to get Epinions subset same size as Bitcoin OTC
 enable_subset_sampling: true
-subset_sampling_method: time_based  # Options: time_based, community_detection, random, high_degree
-target_edge_count: 35000
+subset_sampling_method: bfs_sampling  # Use Vide's suggested BFS approach
+target_edge_count: 35000    # Same scale as Bitcoin OTC full dataset
 subset_preserve_structure: true
+
+# BFS-specific settings (Following Vide's strategy)
+bfs_seed_selection: random_moderate_degree  # Not highest degree as Vide advised
+bfs_degree_percentile: 70  # Select seed from moderate degree nodes
 
 # Optional settings
 memory_optimized: true
