@@ -1,0 +1,58 @@
+{
+  "actual": {
+    "accuracy": 0.9433333333333334,
+    "f1_score": 0.9690346083788707,
+    "precision": 0.9602888086642599,
+    "recall": 0.9779411764705882,
+    "specificity": 0.6071428571428571,
+    "false_positive_rate": 0.39285714285714285,
+    "true_positive": 266,
+    "false_positive": 11,
+    "true_negative": 17,
+    "false_negative": 6,
+    "roc_auc": 0.8795955882352942,
+    "average_precision": 0.9810734576621909
+  },
+  "random_baseline": {
+    "accuracy": 0.5066666666666667,
+    "f1_score": 0.6542056074766355,
+    "precision": 0.8974358974358975,
+    "recall": 0.5147058823529411,
+    "specificity": 0.42857142857142855,
+    "false_positive_rate": 0.5714285714285714,
+    "true_positive": 140,
+    "false_positive": 16,
+    "true_negative": 12,
+    "false_negative": 132,
+    "roc_auc": 0.5403098739495799,
+    "average_precision": 0.9172033191217309
+  },
+  "all_positive_baseline": {
+    "accuracy": 0.9066666666666666,
+    "f1_score": 0.951048951048951,
+    "precision": 0.9066666666666666,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "false_positive_rate": 1.0,
+    "true_positive": 272,
+    "false_positive": 28,
+    "true_negative": 0,
+    "false_negative": 0,
+    "roc_auc": 0.5,
+    "average_precision": 0.9066666666666666
+  },
+  "comparison": {
+    "actual_vs_random_accuracy_improvement": 0.43666666666666665,
+    "actual_vs_random_f1_improvement": 0.3148290009022352,
+    "actual_vs_random_precision_improvement": 0.06285291122836245,
+    "actual_vs_random_recall_improvement": 0.4632352941176471,
+    "actual_vs_all_positive_accuracy_improvement": 0.036666666666666736,
+    "actual_vs_all_positive_f1_improvement": 0.017985657329919635,
+    "actual_vs_all_positive_precision_improvement": 0.0536221419975933,
+    "actual_vs_all_positive_recall_improvement": -0.022058823529411797,
+    "actual_vs_random_roc_auc_improvement": 0.3392857142857143,
+    "actual_vs_random_avg_precision_improvement": 0.06387013854045998,
+    "actual_vs_all_positive_roc_auc_improvement": 0.37959558823529416,
+    "actual_vs_all_positive_avg_precision_improvement": 0.07440679099552427
+  }
+}

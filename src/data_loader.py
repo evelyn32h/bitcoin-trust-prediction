@@ -7,6 +7,35 @@ import joblib
 import random
 from collections import defaultdict
 
+def save_metrics_to_json(metrics, save_path):
+    """
+    Save metrics dictionary to JSON file
+    
+    Parameters:
+    metrics: Dictionary containing metrics
+    save_path: Path to save the JSON file
+    """
+    # Convert numpy types to native Python types for JSON serialization
+    def convert_numpy_types(obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: convert_numpy_types(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy_types(item) for item in obj]
+        return obj
+    
+    metrics_serializable = convert_numpy_types(metrics)
+    
+    with open(save_path, 'w') as f:
+        json.dump(metrics_serializable, f, indent=2)
+    
+    print(f"Metrics saved to {save_path}")
+
 def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None):
     """
     Load dataset (Bitcoin OTC or Epinions) and convert to NetworkX directed weighted graph
@@ -81,7 +110,7 @@ def apply_subset_sampling(df, subset_config):
     Enhanced with BFS sampling method following Vide's strategy.
     
     Parameters:
-    df: Full dataset DataFrame
+    df: Original DataFrame
     subset_config: Dictionary with sampling configuration
     
     Returns:

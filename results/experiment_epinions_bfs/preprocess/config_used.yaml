@@ -1,0 +1,14 @@
+bidirectional_method: max
+data_path: data/soc-sign-epinions.txt
+enable_subset_sampling: true
+experiment_name: experiment_epinions_bfs
+n_folds: 5
+num_test_edges: 3500
+num_validation_edges: 2000
+preserve_original_weights: true
+subset_preserve_structure: true
+subset_sampling_method: bfs_sampling
+target_edge_count: 35000
+use_weighted_features: false
+weight_bins: 5
+weight_method: sign

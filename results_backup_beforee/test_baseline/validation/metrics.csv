@@ -1,9 +1,0 @@
-{
-  "default_threshold": 0.5,
-  "best_f1_threshold": 0.9886772913544575,
-  "best_f1": 0.6391061452513966,
-  "best_accuracy_threshold": 0.9886772913544575,
-  "best_accuracy": 0.677,
-  "roc_auc": 0.677,
-  "average_precision": 0.6281569620253165
-}

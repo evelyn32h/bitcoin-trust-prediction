@@ -1,0 +1,14 @@
+bidirectional_method: max
+data_path: data/soc-sign-bitcoinotc.csv
+enable_subset_sampling: false
+experiment_name: baseline_bitcoin_verification
+n_folds: 5
+num_test_edges: 5000
+num_validation_edges: 4000
+preserve_original_weights: true
+subset_preserve_structure: true
+subset_sampling_method: time_based
+target_edge_count: 40000
+use_weighted_features: false
+weight_bins: 5
+weight_method: raw

@@ -56,6 +56,10 @@ subset_preserve_structure: true
 bfs_seed_selection: random_moderate_degree  # Not highest degree as Vide advised
 bfs_degree_percentile: 70  # Select seed from moderate degree nodes
 
+# Advanced feature extraction settings (Task #1 related)
+# weighted_cycle_features: false  # Whether to use weight-aware cycle features
+# weight_aggregation: 'product'  # How to aggregate weights in cycles: 'product', 'sum', 'mean', 'max'
+
 # Optional settings
 memory_optimized: true
 parallel_processing: true

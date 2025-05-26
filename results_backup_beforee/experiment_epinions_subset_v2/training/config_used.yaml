@@ -1,5 +1,0 @@
-cycle_length: 4
-experiment_name: experiment_epinions_subset_v2
-n_folds: 5
-use_weighted_features: false
-weight_aggregation: product

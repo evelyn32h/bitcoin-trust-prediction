@@ -1,3 +1,0 @@
-Experiment,Dataset,Dataset_Type,Scale,Data_Path,Use_Weighted_Features,Weight_Method,Bidirectional_Method,Enable_Subset_Sampling,Target_Edge_Count,Val_ROC_AUC,Val_Best_F1,Val_Best_Accuracy,Val_Avg_Precision,Test_Accuracy,Test_F1,Test_Precision,Test_Recall,Test_ROC_AUC,Test_Specificity
-baseline_bitcoin,Bitcoin OTC (35K edges),bitcoin_otc,baseline,data/soc-sign-bitcoinotc.csv,False,raw,max,False,0,0.6671,0.756,0.6313,0.7091,0.714,0.7636,0.6507,0.924,0.7567,0.504
-experiment_epinions_subset,Epinions Subset (~40K edges),epinions_subset,subset,data/soc-sign-epinions.txt,False,sign,max,True,40000,0.5286,0.8636,0.7638,0.8055,0.59,0.7084,0.5497,0.996,0.7153,0.184

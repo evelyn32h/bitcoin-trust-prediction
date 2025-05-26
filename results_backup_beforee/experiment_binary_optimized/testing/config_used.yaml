@@ -1,4 +1,0 @@
-cycle_length: 4
-experiment_name: experiment_binary_optimized
-n_folds: 5
-threshold_type: best_accuracy_threshold

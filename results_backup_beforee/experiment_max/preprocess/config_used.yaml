@@ -1,6 +1,0 @@
-bidirectional_method: max
-data_path: data/soc-sign-bitcoinotc.csv
-experiment_name: experiment_max
-n_folds: 5
-num_test_edges: 4000
-num_validation_edges: 4000
