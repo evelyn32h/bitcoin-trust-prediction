@@ -266,7 +266,7 @@ def feature_matrix_from_graph(G, edges=None, k=4, use_weighted_features=False, w
         tuple: (X, y, edge_list) where X is the feature matrix, y is the label vector, and edge_list is the list of edge tuples.
     """
     
-    # Check if edges are provided, otherwise use all edges in the graph
+    # Check if edges are prorequirementd, otherwise use all edges in the graph
     if edges is None:
         edges = list(G.edges(data=True))  # Include edge attributes
 

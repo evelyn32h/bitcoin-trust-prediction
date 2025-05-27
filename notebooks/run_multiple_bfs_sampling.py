@@ -3,7 +3,7 @@
 Multiple BFS Sampling for Better Edge Balance
 ==============================================
 
-Requested by Vide to find Epinions subsets closer to original 85% positive ratio.
+Requested by Requirement to find Epinions subsets closer to original 85% positive ratio.
 Current BFS result: 93% positive / 7% negative
 Target: Find subsets closer to 85% positive / 15% negative
 
@@ -401,7 +401,7 @@ def generate_bfs_summary_report(results, comparison_df, save_dir):
     
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write("# Multiple BFS Sampling Analysis Report\n\n")
-        f.write("Generated in response to Vide's request for better edge balance\n\n")
+        f.write("Generated in response to Requirement's request for better edge balance\n\n")
         
         f.write("## Objective\n")
         f.write("Find Epinions subsets closer to original 85% positive / 15% negative distribution.\n")
@@ -456,7 +456,7 @@ def main():
     """
     print("🔍 Multiple BFS Sampling for Better Edge Balance")
     print("=" * 60)
-    print("Requested by Vide: Find Epinions subsets closer to 85% positive ratio")
+    print("Requested by Requirement: Find Epinions subsets closer to 85% positive ratio")
     print("Current situation: BFS sampling yields 93% positive / 7% negative")
     print("Goal: Improve balance for fairer comparison with Bitcoin OTC dataset\n")
     
@@ -487,7 +487,7 @@ def main():
     save_analysis_results(results, comparison_df)
     
     # Final recommendations
-    print(f"\n💡 Final Recommendations for Vide:")
+    print(f"\n💡 Final Recommendations for Requirement:")
     print("-" * 40)
     
     successful_runs = [r for r in results if r.get('success', False)]

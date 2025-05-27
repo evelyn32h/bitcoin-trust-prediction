@@ -1,0 +1,58 @@
+{
+  "actual": {
+    "accuracy": 0.8754208754208754,
+    "f1_score": 0.9323583180987203,
+    "precision": 0.8854166666666666,
+    "recall": 0.9845559845559846,
+    "specificity": 0.13157894736842105,
+    "false_positive_rate": 0.868421052631579,
+    "true_positive": 255,
+    "false_positive": 33,
+    "true_negative": 5,
+    "false_negative": 4,
+    "roc_auc": 0.8840174761227393,
+    "average_precision": 0.9795734868466615
+  },
+  "random_baseline": {
+    "accuracy": 0.5420875420875421,
+    "f1_score": 0.6714975845410628,
+    "precision": 0.896774193548387,
+    "recall": 0.5366795366795367,
+    "specificity": 0.5789473684210527,
+    "false_positive_rate": 0.42105263157894735,
+    "true_positive": 139,
+    "false_positive": 16,
+    "true_negative": 22,
+    "false_negative": 120,
+    "roc_auc": 0.5615728510465352,
+    "average_precision": 0.9000648025363012
+  },
+  "all_positive_baseline": {
+    "accuracy": 0.8720538720538721,
+    "f1_score": 0.9316546762589928,
+    "precision": 0.8720538720538721,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "false_positive_rate": 1.0,
+    "true_positive": 259,
+    "false_positive": 38,
+    "true_negative": 0,
+    "false_negative": 0,
+    "roc_auc": 0.5,
+    "average_precision": 0.8720538720538721
+  },
+  "comparison": {
+    "actual_vs_random_accuracy_improvement": 0.33333333333333337,
+    "actual_vs_random_f1_improvement": 0.2608607335576575,
+    "actual_vs_random_precision_improvement": -0.011357526881720426,
+    "actual_vs_random_recall_improvement": 0.44787644787644787,
+    "actual_vs_all_positive_accuracy_improvement": 0.0033670033670033517,
+    "actual_vs_all_positive_f1_improvement": 0.0007036418397274868,
+    "actual_vs_all_positive_precision_improvement": 0.013362794612794548,
+    "actual_vs_all_positive_recall_improvement": -0.015444015444015413,
+    "actual_vs_random_roc_auc_improvement": 0.3224446250762041,
+    "actual_vs_random_avg_precision_improvement": 0.07950868431036029,
+    "actual_vs_all_positive_roc_auc_improvement": 0.3840174761227393,
+    "actual_vs_all_positive_avg_precision_improvement": 0.10751961479278938
+  }
+}

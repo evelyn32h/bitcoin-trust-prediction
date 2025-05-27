@@ -40,7 +40,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
     """
     Load dataset (Bitcoin OTC or Epinions) and convert to NetworkX directed weighted graph
     Auto-detects format based on file extension or content
-    Enhanced with BFS subset sampling support following Vide's strategy
+    Enhanced with BFS subset sampling support following Requirement's strategy
     
     Parameters:
     filepath: Path to the data file
@@ -107,7 +107,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
 def apply_subset_sampling(df, subset_config):
     """
     Apply subset sampling to large datasets to make them comparable in size.
-    Enhanced with BFS sampling method following Vide's strategy.
+    Enhanced with BFS sampling method following Requirement's strategy.
     
     Parameters:
     df: Original DataFrame
@@ -124,7 +124,7 @@ def apply_subset_sampling(df, subset_config):
     print(f"Target: ~{target_edge_count} edges (comparable to Bitcoin OTC)")
     
     if sampling_method == 'bfs_sampling':
-        # NEW: BFS sampling following Vide's strategy
+        # NEW: BFS sampling following Requirement's strategy
         df_subset = sample_by_bfs_method(df, target_edge_count, subset_config)
         print(f"BFS sampling: {len(df_subset)} edges")
         
@@ -184,7 +184,7 @@ def apply_subset_sampling(df, subset_config):
 
 def sample_by_bfs_method(df, target_edge_count, subset_config):
     """
-    Apply BFS sampling following Vide's strategy.
+    Apply BFS sampling following Requirement's strategy.
     Same method as used for Bitcoin OTC but optimized for large datasets.
     
     Parameters:
@@ -759,7 +759,7 @@ if __name__ == "__main__":
         else:
             data_path = bitcoin_path
     
-    # Test with BFS sampling (following Vide's strategy)
+    # Test with BFS sampling (following Requirement's strategy)
     subset_config = {
         'subset_sampling_method': 'bfs_sampling',
         'target_edge_count': 35000,

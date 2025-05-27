@@ -204,7 +204,7 @@ def create_balanced_dataset(G):
 
 def optimized_bfs_sampling(G, target_edges, seed_selection='random_moderate_degree', degree_percentile=70):
     """
-    Optimized BFS sampling for large graphs following Vide's strategy.
+    Optimized BFS sampling for large graphs following Requirement's strategy.
     Same method as used for Bitcoin OTC sampling but optimized for Epinions scale.
     
     Parameters:
@@ -231,7 +231,7 @@ def optimized_bfs_sampling(G, target_edges, seed_selection='random_moderate_degr
     # Select seed node based on strategy
     if seed_selection == 'random_moderate_degree':
         # Get degree distribution and select from moderate-degree nodes
-        # Avoid highest degree nodes as Vide suggested
+        # Avoid highest degree nodes as Requirement suggested
         degrees = dict(G_undirected.degree())
         degree_values = list(degrees.values())
         degree_threshold = np.percentile(degree_values, degree_percentile)

@@ -3,7 +3,7 @@
 Epinions Dataset Basic Statistics Analysis
 ==========================================
 
-Generate basic statistics for Epinions dataset as requested by Vide
+Generate basic statistics for Epinions dataset as requested by Requirement
 to explain why experiments failed on this dataset.
 
 Focus: pos/neg ratio, nodes/edges count, embeddedness distribution
@@ -37,7 +37,7 @@ def analyze_epinions_basic_stats():
     print("🔍 Analyzing Epinions Dataset Basic Statistics")
     print("="*60)
     print("Purpose: Understand why Epinions experiments underperformed")
-    print("Requested by Vide: pos/neg ratio, nodes/edges, embeddedness\n")
+    print("Requested by Requirement: pos/neg ratio, nodes/edges, embeddedness\n")
     
     # Create output directory
     output_dir = Path("plots/epinions_analysis")
@@ -431,7 +431,7 @@ def main():
     
     print("🔍 EPINIONS DATASET BASIC STATISTICS ANALYSIS")
     print("="*80)
-    print("As requested by Vide to explain why Epinions experiments failed")
+    print("As requested by Requirement to explain why Epinions experiments failed")
     print("Focus: pos/neg ratio, nodes/edges count, embeddedness distribution")
     print()
     
@@ -444,7 +444,7 @@ def main():
         elapsed = time.time() - start_time
         
         print(f"\n🎯 Analysis completed in {elapsed:.1f} seconds")
-        print(f"📋 Ready for Vide's presentation!")
+        print(f"📋 Ready for Requirement's presentation!")
         print(f"📊 Use these results to explain Epinions experiment performance")
         
     except Exception as e:

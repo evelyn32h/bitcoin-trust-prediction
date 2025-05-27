@@ -26,7 +26,7 @@
   - [x] Performance comparison visualizations
   - [x] False positive rate analysis
 
-### Vide Rabo - Completed ✓
+### Requirements Rabo - Completed ✓
 - [x] Feature extraction implementation
   - [x] Higher-order cycle features (k=3, 4, 5)
   - [x] Matrix-based feature computation

@@ -1,6 +1,6 @@
 # Multiple BFS Sampling Analysis Report
 
-Generated in response to Vide's request for better edge balance
+Generated in response to Requirements's request for better edge balance
 
 ## Objective
 Find Epinions subsets closer to original 85% positive / 15% negative distribution.

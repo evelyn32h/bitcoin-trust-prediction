@@ -83,7 +83,7 @@ def evaluate_sign_predictor(y_true, y_pred, y_prob=None):
         'false_negative': fn
     }
     
-    # Calculate AUC if probabilities are provided
+    # Calculate AUC if probabilities are prorequirementd
     if y_prob is not None:
         y_prob = np.array(y_prob)
         # Convert labels to binary for AUC calculation
@@ -326,7 +326,7 @@ def calculate_test_metrics(y_true, y_pred, y_prob=None):
         'false_negative': int(fn),
     }
     
-    # Add ROC AUC and average precision if probabilities are provided
+    # Add ROC AUC and average precision if probabilities are prorequirementd
     if y_prob_filtered is not None and len(np.unique(y_true_filtered)) > 1:
         try:
             y_binary = (y_true_filtered + 1) / 2  # Convert from {-1, 1} to {0, 1}
@@ -1251,7 +1251,7 @@ def save_run_results(true_labels, predicted_labels, predicted_probabilities, run
         for prob in predicted_probabilities:
             writer.writerow([prob])
 
-    # Save configuration as JSON if provided
+    # Save configuration as JSON if prorequirementd
     if config is not None:
         with open(os.path.join(results_dir, 'config.json'), 'w') as f:
             json.dump(config, f, indent=2)
@@ -1402,7 +1402,7 @@ def calculate_comparative_test_metrics(y_true, y_pred, y_prob=None, random_seed=
         }
     }
     
-    # Add ROC AUC comparisons if probabilities were provided
+    # Add ROC AUC comparisons if probabilities were prorequirementd
     if y_prob is not None:
         comparative_results['comparison'].update({
             'actual_vs_random_roc_auc_improvement': actual_metrics.get('roc_auc', 0) - random_metrics.get('roc_auc', 0),
