@@ -1,68 +1,111 @@
-# Configuration file for Bitcoin Trust Prediction Project
-# UPDATED WITH OPTIMAL 74:12:14 SPLIT RATIO
+# Optimal Configuration for Bitcoin Trust Prediction Project
+# OPTIMAL 74:12:14 SPLIT RATIO with Complete Parameter Variations
 
 # Dataset Configuration
-data_path: data/soc-sign-epinions-best-balance.txt
+data_path: data/soc-sign-bitcoinotc.csv
 
-# Experiment naming
-default_experiment_name: experiment_epinions_optimal_balance
+# Experiment naming template - will be modified by experiment scripts
+default_experiment_name: experiment_optimal_baseline
 
 # Cross-validation settings
 default_n_folds: 5
 
-# Feature extraction settings
+# FIXED CYCLE LENGTH - can be varied in experiments
 cycle_length: 4
 
-# UPDATED: Data splitting settings using optimal 74:12:14 ratio
-# Target: Test=3080, Validation=2640, remaining for training
-num_test_edges: 3080          # Fixed: Optimal test set size
-num_validation_edges: 2640    # Fixed: Optimal validation set size
+# FIXED OPTIMAL SPLIT RATIO: 74:12:14
+# This configuration achieves better accuracy
+num_test_edges: 3080          # Fixed: 14% for test set
+num_validation_edges: 2640    # Fixed: 12% for validation set
+# Remaining 74% automatically goes to training
 
 # Model training settings
 default_threshold: 0.5
 
-# Training settings (ENABLE filtering feature)
+# Training settings
 min_train_embeddedness: 1
-pos_train_edges_ratio: 0.8  # ACTIVATE: 80% positive as in original Epinions
+pos_train_edges_ratio: 0.8    # Will be varied in experiments
 
-# Validation settings (ENABLE filtering feature)
-nr_val_predictions: 200     # Match requirements: 200
+# Validation settings  
+nr_val_predictions: 200
 min_val_embeddedness: 1
-pos_edges_ratio: 0.8       # ACTIVATE: 80% positive for balanced validation
+pos_edges_ratio: 0.8         # Will be varied in experiments
 
-# Testing settings (ENABLE filtering feature)
+# Testing settings
 threshold_type: best_accuracy_threshold
-n_test_predictions: 300     # Match requirements: 300
+n_test_predictions: 300
 min_test_embeddedness: 1
-pos_test_edges_ratio: 0.8   # ACTIVATE: 80% positive for balanced testing
+pos_test_edges_ratio: 0.8    # Will be varied in experiments
 
-# Task 1: Weighted Features Configuration
-use_weighted_features: false  # Match requirements: unweighted for fair comparison
+# Feature Configuration
+use_weighted_features: false  # Unweighted performs better as baseline
 weight_method: raw
 weight_bins: 5
 preserve_original_weights: true
 
-# Task 2: Bidirectional Edge Handling
+# Structural and Centrality Features
+use_structural_features: true
+use_centrality_features: true
+
+# Bidirectional Edge Handling
 bidirectional_method: max
 
 # BFS SAMPLING CONFIGURATION
-# Apply BFS sampling to get Epinions subset same size as Bitcoin OTC
 enable_subset_sampling: true
-subset_sampling_method: bfs_sampling  # Use suggested BFS approach
-target_edge_count: 35000    # Same scale as Bitcoin OTC full dataset
+subset_sampling_method: bfs_sampling
+target_edge_count: 35000
 subset_preserve_structure: true
 
 # BFS-specific settings
-bfs_seed_selection: random_moderate_degree  # Not highest degree as advised
-bfs_degree_percentile: 70  # Select seed from moderate degree nodes
+bfs_seed_selection: random_moderate_degree
+bfs_degree_percentile: 70
 
-# OPTIMAL SPLIT RATIO CONFIGURATION
-# These parameters define the 74:12:14 split ratio
+# OPTIMAL SPLIT RATIO (FIXED)
 split_ratio:
   train: 0.74    # 74% for training
   validation: 0.12  # 12% for validation (2640 samples)
   test: 0.14     # 14% for testing (3080 samples)
 
+# PARAMETER VARIATIONS FOR EXPERIMENTS
+# These will be systematically varied while keeping the optimal split
+
+# Cycle lengths to test (Step 7 experiments)  
+cycle_lengths: [3, 4, 5]
+
+# Positive ratios to test (Step 6 & 8 experiments)
+positive_ratios: [0.9, 0.8, 0.7, 0.6, 0.5]
+
+# Embeddedness levels to test (Step 3 experiments)
+embeddedness_levels: [0, 1, 2]
+
+# Ratio descriptions for clarity
+ratio_descriptions:
+  0.9: "90%-10% (Raw Distribution)"
+  0.8: "80%-20% (Standard)"
+  0.7: "70%-30% (Moderate Balance)"
+  0.6: "60%-40% (Near Balance)"
+  0.5: "50%-50% (Perfect Balance)"
+
+# Embeddedness descriptions
+embeddedness_descriptions:
+  0: "No filtering (all nodes)"
+  1: "Moderate filtering (standard)"
+  2: "Strong filtering (high embeddedness only)"
+
+# Feature type descriptions
+feature_descriptions:
+  weighted: "Uses edge weight information"
+  unweighted: "Binary edge information only"
+
 # Optional settings
 memory_optimized: true
 parallel_processing: true
+
+# Experiment tracking
+optimal_split: true
+split_type: "optimal_74_12_14"
+
+# Output settings
+save_predictions: true
+save_model: false
+verbose: true

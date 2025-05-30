@@ -1,0 +1,68 @@
+bfs_degree_percentile: 70
+bfs_seed_selection: random_moderate_degree
+bidirectional_method: max
+cycle_length: 4
+cycle_lengths:
+- 3
+- 4
+- 5
+data_path: data/soc-sign-bitcoinotc.csv
+default_experiment_name: experiment_optimal_baseline
+default_n_folds: 5
+default_threshold: 0.5
+embeddedness_descriptions:
+  0: No filtering (all nodes)
+  1: Moderate filtering (standard)
+  2: Strong filtering (high embeddedness only)
+embeddedness_levels:
+- 0
+- 1
+- 2
+enable_subset_sampling: true
+experiment_name: embed_1_optimal
+feature_descriptions:
+  unweighted: Binary edge information only
+  weighted: Uses edge weight information
+memory_optimized: true
+min_test_embeddedness: 1
+min_train_embeddedness: 1
+min_val_embeddedness: 1
+n_test_predictions: 300
+nr_val_predictions: 200
+num_test_edges: 3080
+num_validation_edges: 2640
+optimal_split: true
+parallel_processing: true
+pos_edges_ratio: 0.8
+pos_test_edges_ratio: 0.8
+pos_train_edges_ratio: 0.8
+positive_ratios:
+- 0.9
+- 0.8
+- 0.7
+- 0.6
+- 0.5
+preserve_original_weights: true
+ratio_descriptions:
+  0.5: 50%-50% (Perfect Balance)
+  0.6: 60%-40% (Near Balance)
+  0.7: 70%-30% (Moderate Balance)
+  0.8: 80%-20% (Standard)
+  0.9: 90%-10% (Raw Distribution)
+save_model: false
+save_predictions: true
+split_ratio:
+  test: 0.14
+  train: 0.74
+  validation: 0.12
+split_type: optimal_74_12_14
+subset_preserve_structure: true
+subset_sampling_method: bfs_sampling
+target_edge_count: 35000
+threshold_type: best_accuracy_threshold
+use_centrality_features: true
+use_structural_features: true
+use_weighted_features: false
+verbose: true
+weight_bins: 5
+weight_method: raw

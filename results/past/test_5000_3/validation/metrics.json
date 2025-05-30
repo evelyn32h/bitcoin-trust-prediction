@@ -1,0 +1,43 @@
+{
+  "actual": {
+    "default_threshold": 0.5,
+    "default_f1": 0.9329305135951661,
+    "default_accuracy": 0.889,
+    "best_f1_threshold": 0.5700000000000001,
+    "best_f1": 0.9345454545454546,
+    "best_accuracy_threshold": 0.5700000000000001,
+    "best_accuracy": 0.892,
+    "roc_auc": 0.838325,
+    "average_precision": 0.9348183459628308
+  },
+  "random_baseline": {
+    "default_threshold": 0.5,
+    "default_f1": 0.6029298380878951,
+    "default_accuracy": 0.485,
+    "best_f1_threshold": 0.0,
+    "best_f1": 0.888888888888889,
+    "best_accuracy_threshold": 0.0,
+    "best_accuracy": 0.8,
+    "roc_auc": 0.48007500000000003,
+    "average_precision": 0.7904053444462804
+  },
+  "all_positive_baseline": {
+    "default_threshold": 0.5,
+    "default_f1": 0.888888888888889,
+    "default_accuracy": 0.8,
+    "best_f1_threshold": 0.0,
+    "best_f1": 0.888888888888889,
+    "best_accuracy_threshold": 0.0,
+    "best_accuracy": 0.8,
+    "roc_auc": 0.5,
+    "average_precision": 0.8
+  },
+  "comparison": {
+    "actual_vs_random_f1_improvement": 0.04565656565656562,
+    "actual_vs_random_accuracy_improvement": 0.09199999999999997,
+    "actual_vs_random_roc_auc_improvement": 0.35824999999999996,
+    "actual_vs_all_positive_f1_improvement": 0.04565656565656562,
+    "actual_vs_all_positive_accuracy_improvement": 0.09199999999999997,
+    "actual_vs_all_positive_roc_auc_improvement": 0.338325
+  }
+}

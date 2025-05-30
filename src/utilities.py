@@ -144,13 +144,13 @@ def print_comparative_evaluation_metrics(comparative_results):
         
         # Assessment logic
         if f1_improvement > 0.1 and auc_improvement > 0.1:
-            assessment = "🟢 EXCELLENT - Model significantly outperforms baselines"
+            assessment = "[EXCELLENT] - Model significantly outperforms baselines"
         elif f1_improvement > 0.05 and auc_improvement > 0.05:
-            assessment = "🟡 GOOD - Model moderately outperforms baselines"
+            assessment = "[GOOD] - Model moderately outperforms baselines"
         elif f1_improvement > 0 and auc_improvement > 0:
-            assessment = "🟠 FAIR - Model slightly outperforms baselines"
+            assessment = "[FAIR] - Model slightly outperforms baselines"
         else:
-            assessment = "🔴 POOR - Model does not outperform baselines"
+            assessment = "[POOR] - Model does not outperform baselines"
         
         print(f"   Overall Assessment: {assessment}")
         
@@ -283,13 +283,13 @@ def print_comparative_test_metrics(comparative_results):
         
         # Assessment logic
         if f1_improvement > 0.1 and acc_improvement > 0.1:
-            assessment = "🟢 EXCELLENT - Model significantly outperforms baselines"
+            assessment = "[EXCELLENT] - Model significantly outperforms baselines"
         elif f1_improvement > 0.05 and acc_improvement > 0.05:
-            assessment = "🟡 GOOD - Model moderately outperforms baselines"
+            assessment = "[GOOD] - Model moderately outperforms baselines"
         elif f1_improvement > 0 and acc_improvement > 0:
-            assessment = "🟠 FAIR - Model slightly outperforms baselines"
+            assessment = "[FAIR] - Model slightly outperforms baselines"
         else:
-            assessment = "🔴 POOR - Model does not outperform baselines"
+            assessment = "[POOR] - Model does not outperform baselines"
         
         print(f"   Overall Assessment: {assessment}")
         
@@ -420,4 +420,3 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
     print(f"Sampled {len(sample)} edges: {pos_count} positive, {embeddedness_count} meeting embeddedness ≥ {min_embeddedness if min_embeddedness is not None else 0}")
     
     return sample
-

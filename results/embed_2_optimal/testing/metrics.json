@@ -1,0 +1,58 @@
+{
+  "actual": {
+    "accuracy": 0.9166666666666666,
+    "f1_score": 0.9486652977412731,
+    "precision": 0.9352226720647774,
+    "recall": 0.9625,
+    "specificity": 0.7333333333333333,
+    "false_positive_rate": 0.26666666666666666,
+    "true_positive": 231,
+    "false_positive": 16,
+    "true_negative": 44,
+    "false_negative": 9,
+    "roc_auc": 0.8764583333333333,
+    "average_precision": 0.9444830910826889
+  },
+  "random_baseline": {
+    "accuracy": 0.5,
+    "f1_score": 0.6212121212121212,
+    "precision": 0.7884615384615384,
+    "recall": 0.5125,
+    "specificity": 0.45,
+    "false_positive_rate": 0.55,
+    "true_positive": 123,
+    "false_positive": 33,
+    "true_negative": 27,
+    "false_negative": 117,
+    "roc_auc": 0.5465972222222222,
+    "average_precision": 0.8312498357737573
+  },
+  "all_positive_baseline": {
+    "accuracy": 0.8,
+    "f1_score": 0.8888888888888888,
+    "precision": 0.8,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "false_positive_rate": 1.0,
+    "true_positive": 240,
+    "false_positive": 60,
+    "true_negative": 0,
+    "false_negative": 0,
+    "roc_auc": 0.5,
+    "average_precision": 0.8
+  },
+  "comparison": {
+    "actual_vs_random_accuracy_improvement": 0.41666666666666663,
+    "actual_vs_random_f1_improvement": 0.32745317652915185,
+    "actual_vs_random_precision_improvement": 0.14676113360323895,
+    "actual_vs_random_recall_improvement": 0.45000000000000007,
+    "actual_vs_all_positive_accuracy_improvement": 0.11666666666666659,
+    "actual_vs_all_positive_f1_improvement": 0.05977640885238422,
+    "actual_vs_all_positive_precision_improvement": 0.13522267206477734,
+    "actual_vs_all_positive_recall_improvement": -0.03749999999999998,
+    "actual_vs_random_roc_auc_improvement": 0.32986111111111116,
+    "actual_vs_random_avg_precision_improvement": 0.11323325530893158,
+    "actual_vs_all_positive_roc_auc_improvement": 0.37645833333333334,
+    "actual_vs_all_positive_avg_precision_improvement": 0.14448309108268886
+  }
+}

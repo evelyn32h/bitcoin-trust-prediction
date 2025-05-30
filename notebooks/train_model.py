@@ -65,7 +65,7 @@ def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, wei
         strict=True
     )
     
-    # Extract features with Task #1 support
+    # Extract features with enhanced support
     X_train, y_train, _ = feature_matrix_from_graph(
         G_train, 
         edges=sampled_edges,
@@ -89,7 +89,7 @@ def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, wei
 def train_all_models(training_sets, cycle_length, use_weighted_features=False, weight_aggregation='product'):
     """
     Trains a model and scaler for each training set and returns a list of (model, scaler) tuples.
-    Now supports weighted features (Task #1).
+    Now supports weighted features.
     """
     results = []
     for fold, G_train in enumerate(training_sets):
@@ -125,9 +125,9 @@ def main():
         print(f"WARNING: The preprocess directory '{training_dir}' does not exist. Please run preprocess.py first.")
         return
 
-    # Load experiment configuration (Task #1 support)
+    # Load experiment configuration
     exp_config = load_experiment_config(args.name)
-    use_weighted_features = exp_config.get('use_weighted_features', False) # TODO: should be program args
+    use_weighted_features = exp_config.get('use_weighted_features', False)
     weight_aggregation = exp_config.get('weight_aggregation', 'product')
     
     print(f"Configuration loaded:")
@@ -154,7 +154,7 @@ def main():
         'weight_aggregation': weight_aggregation
     }, out_dir)
     
-    print("\n✓ All models trained and saved.")
+    print("\nSUCCESS: All models trained and saved.")
 
 if __name__ == "__main__":
     main()

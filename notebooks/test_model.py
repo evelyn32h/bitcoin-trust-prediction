@@ -81,7 +81,7 @@ def test_model_on_set(G_test, model, scaler, cycle_length, threshold, use_weight
         edge_data = G_test[u][v].copy()
         G_test.remove_edge(u, v)
         
-        # Extract and scale features for this edge with Task #1 support
+        # Extract and scale features for this edge with enhanced support
         X_test, y_test, _ = feature_matrix_from_graph(
             G_test, 
             edges=[(u, v, data)], 
@@ -123,7 +123,7 @@ def main():
 
     test_path = os.path.join(PROJECT_ROOT, 'results', args.name, 'preprocess', 'test.csv')
     training_dir = os.path.join(PROJECT_ROOT, 'results', args.name, 'training')
-    validation_metrics_path = os.path.join(PROJECT_ROOT, 'results', args.name, 'validation', 'metrics.json')  # FIXED: Changed from .csv to .json
+    validation_metrics_path = os.path.join(PROJECT_ROOT, 'results', args.name, 'validation', 'metrics.json')
     out_dir = os.path.join(PROJECT_ROOT, 'results', args.name, 'testing')
     os.makedirs(out_dir, exist_ok=True)
 
@@ -137,7 +137,7 @@ def main():
         print(f"WARNING: The validation metrics '{validation_metrics_path}' do not exist. Please run validate_model.py first.")
         return
 
-    # Load experiment configuration (Task #1 support)
+    # Load experiment configuration
     exp_config = load_experiment_config(args.name)
     use_weighted_features = exp_config.get('use_weighted_features', False)
     weight_aggregation = exp_config.get('weight_aggregation', 'product')
@@ -152,7 +152,7 @@ def main():
     # Select threshold
     threshold = metrics['actual'].get(args.threshold_type, 0.5)
     print(f"Using threshold {threshold} (type: {args.threshold_type})")
-    print(f"Task #1 settings: weighted_features={use_weighted_features}, aggregation={weight_aggregation}")
+    print(f"Enhanced settings: weighted_features={use_weighted_features}, aggregation={weight_aggregation}")
 
     # For simplicity, use the first model/scaler (or could ensemble)
     # TODO use aggregate of models?
@@ -180,7 +180,7 @@ def main():
         'use_weighted_features': use_weighted_features,
         'weight_aggregation': weight_aggregation
     }, out_dir)
-    print(f"\n✓ Test results saved to {out_dir}")
+    print(f"\nSUCCESS: Test results saved to {out_dir}")
 
 if __name__ == "__main__":
     main()

@@ -10,6 +10,7 @@ This script runs the complete experiment pipeline consisting of:
 5. Analysis (analyze_results.py)
 
 You can selectively enable/disable pipeline steps using command line arguments.
+You can also specify a custom config file to override default parameters.
 """
 
 import os
@@ -28,13 +29,28 @@ os.chdir(PROJECT_ROOT)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Load config from YAML
-with open(os.path.join(PROJECT_ROOT, 'config.yaml'), 'r') as f:
-    config = yaml.safe_load(f)
-
-DEFAULT_EXPERIMENT_NAME = config['default_experiment_name']
-N_FOLDS = config['default_n_folds']
-CYCLE_LENGTH = config['cycle_length']
+def load_config(config_path=None):
+    """
+    Load configuration from YAML file
+    
+    Args:
+        config_path: Path to config file. If None, uses default config.yaml
+    
+    Returns:
+        dict: Configuration dictionary
+    """
+    if config_path is None:
+        config_path = os.path.join(PROJECT_ROOT, 'config.yaml')
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    
+    print(f"Loading configuration from: {config_path}")
+    
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    return config
 
 def run_command(cmd, description, cwd=None):
     """
@@ -61,17 +77,17 @@ def run_command(cmd, description, cwd=None):
     try:
         result = subprocess.run(cmd, cwd=cwd, check=True, capture_output=False)
         elapsed = time.time() - start_time
-        print(f"\n✓ {description} completed successfully in {elapsed:.1f} seconds")
+        print(f"\nSUCCESS: {description} completed successfully in {elapsed:.1f} seconds")
         return True
     except subprocess.CalledProcessError as e:
         elapsed = time.time() - start_time
-        print(f"\n✗ {description} failed after {elapsed:.1f} seconds with exit code {e.returncode}")
+        print(f"\nFAILED: {description} failed after {elapsed:.1f} seconds with exit code {e.returncode}")
         return False
     except FileNotFoundError:
-        print(f"\n✗ {description} failed: Command not found")
+        print(f"\nFAILED: {description} failed: Command not found")
         return False
 
-def run_preprocess(args):
+def run_preprocess(args, config):
     """Run the preprocessing step."""
     cmd = ['python', 'notebooks/preprocess.py', '--name', args.name]
     
@@ -85,7 +101,7 @@ def run_preprocess(args):
     
     return run_command(cmd, "Data Preprocessing")
 
-def run_training(args):
+def run_training(args, config):
     """Run the training step."""
     cmd = ['python', 'notebooks/train_model.py', 
            '--name', args.name,
@@ -94,7 +110,7 @@ def run_training(args):
     
     return run_command(cmd, "Model Training")
 
-def run_validation(args):
+def run_validation(args, config):
     """Run the validation step."""
     cmd = ['python', 'notebooks/validate_model.py',
            '--name', args.name,
@@ -109,7 +125,7 @@ def run_validation(args):
     
     return run_command(cmd, "Model Validation")
 
-def run_testing(args):
+def run_testing(args, config):
     """Run the testing step."""
     cmd = ['python', 'notebooks/test_model.py',
            '--name', args.name,
@@ -122,18 +138,19 @@ def run_testing(args):
     
     return run_command(cmd, "Model Testing")
 
-def run_analysis(args):
+def run_analysis(args, config):
     """Run the results analysis step."""
     cmd = ['python', 'notebooks/analyze_results.py', '--name', args.name]
     
     return run_command(cmd, "Results Analysis")
 
-def print_experiment_summary(args, results, total_time):
+def print_experiment_summary(args, config, results, total_time):
     """Print a summary of the experiment run."""
     print(f"\n{'='*80}")
     print(f"EXPERIMENT SUMMARY")
     print(f"{'='*80}")
     print(f"Experiment Name: {args.name}")
+    print(f"Config File: {args.config or 'config.yaml (default)'}")
     print(f"Start Time: {args._start_time}")
     print(f"Total Runtime: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
     print(f"Configuration:")
@@ -144,22 +161,31 @@ def print_experiment_summary(args, results, total_time):
         print(f"  - Weight Method: {args.weight_method}")
         print(f"  - Bidirectional Method: {args.bidirectional_method}")
     
+    # Print key config parameters if available
+    if config:
+        if 'min_train_embeddedness' in config:
+            print(f"  - Min Train Embeddedness: {config['min_train_embeddedness']}")
+        if 'min_test_embeddedness' in config:
+            print(f"  - Min Test Embeddedness: {config['min_test_embeddedness']}")
+        if 'use_weighted_features' in config:
+            print(f"  - Config Weighted Features: {config['use_weighted_features']}")
+    
     print(f"\nPipeline Steps:")
     step_names = ['Preprocessing', 'Training', 'Validation', 'Testing', 'Analysis']
     step_flags = [args.preprocess, args.train, args.validate, args.test, args.analyze]
     
     for name, enabled, result in zip(step_names, step_flags, results):
         if enabled:
-            status = "✓ SUCCESS" if result else "✗ FAILED"
+            status = "SUCCESS" if result else "FAILED"
             print(f"  - {name}: {status}")
         else:
             print(f"  - {name}: SKIPPED")
     
     # Overall status
     if all(result for result, enabled in zip(results, step_flags) if enabled):
-        print(f"\n🎉 Experiment completed successfully!")
+        print(f"\nSUCCESS: Experiment completed successfully!")
     else:
-        print(f"\n⚠️  Experiment completed with some failures.")
+        print(f"\nWARNING: Experiment completed with some failures.")
     
     print(f"{'='*80}")
 
@@ -169,8 +195,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run full pipeline
+  # Run full pipeline with default config
   python run_experiment.py --name my_experiment
+
+  # Run with custom config file
+  python run_experiment.py --name my_experiment --config config_custom.yaml
 
   # Run only preprocessing and training (using short flags)
   python run_experiment.py --name my_experiment -p -tr
@@ -191,6 +220,20 @@ Examples:
   python run_experiment.py --name existing_exp -a
         """
     )
+    
+    # Configuration file argument - ADD THIS FIRST
+    parser.add_argument('--config', type=str, 
+                       help="Path to YAML config file (overrides default config.yaml)")
+    
+    # Load config early to get defaults
+    # We need to parse known args first to get the config path
+    known_args, remaining_args = parser.parse_known_args()
+    config = load_config(known_args.config)
+    
+    # Extract defaults from config
+    DEFAULT_EXPERIMENT_NAME = config.get('default_experiment_name', 'default_experiment')
+    N_FOLDS = config.get('default_n_folds', 5)
+    CYCLE_LENGTH = config.get('cycle_length', 4)
     
     # Experiment configuration
     parser.add_argument('--name', type=str, default=DEFAULT_EXPERIMENT_NAME,
@@ -232,7 +275,7 @@ Examples:
     parser.add_argument('--bidirectional_method', type=str,
                        help="Method for handling bidirectional edges")
     parser.add_argument('--use_weighted_features', action='store_true',
-                       help="Enable weighted features (Task #1)")
+                       help="Enable weighted features")
     parser.add_argument('--weight_method', type=str,
                        help="Weight processing method: sign, raw, binned")
     
@@ -246,7 +289,11 @@ Examples:
     parser.add_argument('--threshold_type', type=str,
                        help="Threshold type for testing (e.g., default_threshold, best_f1_threshold)")
     
+    # Parse all arguments now
     args = parser.parse_args()
+    
+    # Reload config in case it changed
+    config = load_config(args.config)
     
     # Handle "only" mode: if any -p, -tr, -v, -te, -a flags are used,
     # disable all steps first, then enable only the specified ones
@@ -279,6 +326,7 @@ Examples:
     
     # Print experiment configuration
     print(f"Starting experiment: {args.name}")
+    print(f"Using config: {args.config or 'config.yaml (default)'}")
     print(f"Pipeline steps to run: ", end="")
     steps = []
     if args.preprocess: steps.append("preprocess")
@@ -288,43 +336,54 @@ Examples:
     if args.analyze: steps.append("analyze")
     print(" → ".join(steps))
     
+    # Print key configuration parameters
+    print(f"\nKey Configuration Parameters:")
+    if 'min_train_embeddedness' in config:
+        print(f"  - Min Train Embeddedness: {config['min_train_embeddedness']}")
+    if 'min_test_embeddedness' in config:
+        print(f"  - Min Test Embeddedness: {config['min_test_embeddedness']}")
+    if 'use_weighted_features' in config:
+        print(f"  - Use Weighted Features: {config['use_weighted_features']}")
+    if 'cycle_length' in config:
+        print(f"  - Cycle Length: {config['cycle_length']}")
+    
     # Run pipeline steps
     results = []
     
     if args.preprocess:
-        results.append(run_preprocess(args))
+        results.append(run_preprocess(args, config))
     else:
         results.append(True)  # Skipped steps count as successful
         
     if args.train:
         if not args.preprocess:
             print("\nNote: Training without preprocessing - ensure preprocess data exists")
-        results.append(run_training(args))
+        results.append(run_training(args, config))
     else:
         results.append(True)
         
     if args.validate:
         if not args.train and not args.preprocess:
             print("\nNote: Validation without training/preprocessing - ensure trained models exist")
-        results.append(run_validation(args))
+        results.append(run_validation(args, config))
     else:
         results.append(True)
         
     if args.test:
         if not args.validate and not args.train and not args.preprocess:
             print("\nNote: Testing without previous steps - ensure all prerequisites exist")
-        results.append(run_testing(args))
+        results.append(run_testing(args, config))
     else:
         results.append(True)
         
     if args.analyze:
-        results.append(run_analysis(args))
+        results.append(run_analysis(args, config))
     else:
         results.append(True)
     
     # Print summary
     total_time = time.time() - experiment_start
-    print_experiment_summary(args, results, total_time)
+    print_experiment_summary(args, config, results, total_time)
     
     # Exit with error code if any step failed
     if not all(result for result, enabled in zip(results, [args.preprocess, args.train, args.validate, args.test, args.analyze]) if enabled):

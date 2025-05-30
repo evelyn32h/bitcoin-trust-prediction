@@ -56,7 +56,7 @@ def calculate_optimal_split_sizes(total_edges):
     Returns:
     dict: Split sizes and validation info
     """
-    print(f"\n🔢 Calculating optimal split for {total_edges:,} total edges")
+    print(f"\n Calculating optimal split for {total_edges:,} total edges")
     print(f"Target split ratio: {SPLIT_RATIOS['train']:.0%}:{SPLIT_RATIOS['validation']:.0%}:{SPLIT_RATIOS['test']:.0%}")
     
     # Use specific optimal counts
@@ -78,7 +78,7 @@ def calculate_optimal_split_sizes(total_edges):
     
     # Check if we have enough edges
     if train_size < 1000:
-        print(f"⚠️  Warning: Training set very small ({train_size:,} edges)")
+        print(f" Warning: Training set very small ({train_size:,} edges)")
     
     if total_edges < (test_size + validation_size):
         raise ValueError(f"Dataset too small: need {test_size + validation_size:,} edges, have {total_edges:,}")
@@ -108,25 +108,25 @@ def create_splits_optimal(G, n_folds, test_edges, validation_edges):
     Returns:
     (G_test, [(G_train, G_val), ...])
     """
-    print(f"\n🔄 Creating splits with optimal configuration")
+    print(f"\n Creating splits with optimal configuration")
     print(f"Total edges available: {G.number_of_edges():,}")
     
     # Calculate and validate split sizes
     split_info = calculate_optimal_split_sizes(G.number_of_edges())
     
     # Extract a single test split first using BFS method
-    print(f"\n1️⃣ Creating test set ({test_edges:,} edges)...")
+    print(f"\n Creating test set ({test_edges:,} edges)...")
     test_seed_edge = sample_random_seed_edges(G, n=1, random_state=123)[0]
     G_trainval, G_test = edge_bfs_holdout_split(G, test_seed_edge, test_edges)
     
     actual_test_size = G_test.number_of_edges()
-    print(f"✅ Test set created: {actual_test_size:,} edges")
+    print(f" Test set created: {actual_test_size:,} edges")
     
     if abs(actual_test_size - test_edges) > test_edges * 0.1:  # Allow 10% tolerance
-        print(f"⚠️  Warning: Test set size differs from target by {actual_test_size - test_edges:+,} edges")
+        print(f"  Warning: Test set size differs from target by {actual_test_size - test_edges:+,} edges")
     
     # Now split the remaining graph into training/validation splits in parallel
-    print(f"\n2️⃣ Creating {n_folds} train/validation splits from remaining {G_trainval.number_of_edges():,} edges...")
+    print(f"\n Creating {n_folds} train/validation splits from remaining {G_trainval.number_of_edges():,} edges...")
     
     seed_edges = sample_random_seed_edges(G_trainval, n=n_folds, random_state=42)
     splits = []
@@ -154,7 +154,7 @@ def create_splits_optimal(G, n_folds, test_edges, validation_edges):
         
         total_used = actual_test_size + avg_val_size + avg_train_size
         
-        print(f"\n📊 Final split summary:")
+        print(f"\n Final split summary:")
         print(f"  Average train size: {avg_train_size:,.0f} edges ({avg_train_size/G.number_of_edges():.1%})")
         print(f"  Average val size:   {avg_val_size:,.0f} edges ({avg_val_size/G.number_of_edges():.1%})")
         print(f"  Test size:          {actual_test_size:,} edges ({actual_test_size/G.number_of_edges():.1%})")
@@ -165,9 +165,9 @@ def create_splits_optimal(G, n_folds, test_edges, validation_edges):
         actual_test_ratio = actual_test_size / G.number_of_edges()
         
         if abs(actual_test_ratio - target_test_ratio) < 0.02:  # Within 2%
-            print(f"✅ Split ratios match optimal configuration!")
+            print(f" Split ratios match optimal configuration!")
         else:
-            print(f"⚠️  Split ratios differ from target (test: {actual_test_ratio:.1%} vs {target_test_ratio:.1%})")
+            print(f"  Split ratios differ from target (test: {actual_test_ratio:.1%} vs {target_test_ratio:.1%})")
     
     return G_test, splits
 
@@ -181,7 +181,7 @@ def save_splits(G_test, splits, out_dir):
     # Save test split
     test_path = os.path.join(out_dir, 'test.csv')
     save_graph_to_csv(G_test, test_path)
-    print(f"💾 Saved test split to {test_path} ({G_test.number_of_edges():,} edges)")
+    print(f" Saved test split to {test_path} ({G_test.number_of_edges():,} edges)")
     
     # Save train/validation splits
     total_train_edges = 0
@@ -200,13 +200,13 @@ def save_splits(G_test, splits, out_dir):
         total_train_edges += train_edges
         total_val_edges += val_edges
         
-        print(f"💾 Saved fold {i}: train={train_edges:,} edges, val={val_edges:,} edges")
+        print(f" Saved fold {i}: train={train_edges:,} edges, val={val_edges:,} edges")
     
     # Summary report
     avg_train = total_train_edges / len(splits) if splits else 0
     avg_val = total_val_edges / len(splits) if splits else 0
     
-    print(f"\n📋 Split summary:")
+    print(f"\n Split summary:")
     print(f"  Test set:     {G_test.number_of_edges():,} edges (target: {N_TEST_EDGES:,})")
     print(f"  Avg train:    {avg_train:,.0f} edges per fold")
     print(f"  Avg val:      {avg_val:,.0f} edges per fold (target: {N_VALIDATION_EDGES:,})")
@@ -229,7 +229,7 @@ def preprocess_graph(G, bidirectional_method='max', use_weighted_features=False,
     Returns:
     G_processed: Processed undirected graph
     """
-    print("🔧 Preprocessing graph for optimal split...")
+    print(" Preprocessing graph for optimal split...")
     print(f"Original graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     print(f"Task #1 - Use weighted features: {use_weighted_features}")
     print(f"Weight method: {weight_method}")
@@ -298,7 +298,7 @@ def main():
     test_edges = args.test_edges
     val_edges = args.val_edges
     
-    print(f"🚀 OPTIMAL SPLIT CONFIGURATION")
+    print(f"OPTIMAL SPLIT CONFIGURATION")
     print(f"=" * 50)
     print(f"Split ratio: {SPLIT_RATIOS['train']:.0%}:{SPLIT_RATIOS['validation']:.0%}:{SPLIT_RATIOS['test']:.0%}")
     print(f"Test edges: {test_edges:,}")
@@ -322,7 +322,7 @@ def main():
     } if enable_subset_sampling else None
 
     # Load data with optional subset sampling
-    print(f"\n📂 Loading data from {DATA_PATH}...")
+    print(f"\n Loading data from {DATA_PATH}...")
     G, df = load_bitcoin_data(DATA_PATH, 
                              enable_subset_sampling=enable_subset_sampling, 
                              subset_config=subset_config)
@@ -335,7 +335,7 @@ def main():
                         preserve_original_weights=preserve_original_weights)
 
     # Create splits using optimal configuration
-    print(f"\n🎯 Creating splits with optimal 74:12:14 ratio...")
+    print(f"\nCreating splits with optimal 74:12:14 ratio...")
     G_test, splits = create_splits_optimal(G, N_FOLDS, test_edges, val_edges)
     
     # Save splits to project root results directory
@@ -366,9 +366,9 @@ def main():
     
     save_config(config_to_save, out_dir)
     
-    print(f"\n✅ OPTIMAL PREPROCESSING COMPLETE!")
-    print(f"📁 Results saved to: {out_dir}")
-    print(f"🎯 Ready for improved performance with optimal split ratios!")
+    print(f"\n OPTIMAL PREPROCESSING COMPLETE!")
+    print(f" Results saved to: {out_dir}")
+    print(f" Ready for improved performance with optimal split ratios!")
 
 if __name__ == "__main__":
     main()

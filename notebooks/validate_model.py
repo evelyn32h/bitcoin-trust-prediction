@@ -60,7 +60,7 @@ def load_experiment_config(experiment_name):
 def validate_model_on_fold(args):
     """
     Validate a single fold: predict edge signs for a sampled subset of validation edges.
-    Removes each edge before prediction to avoid data leakage (like inductive_evalution.py).
+    Removes each edge before prediction to avoid data leakage.
     Returns true labels, predicted labels, predicted probabilities, fold index, and fold runtime.
     Now supports weighted features.
     """
@@ -86,7 +86,7 @@ def validate_model_on_fold(args):
         edge_data = G_val[u][v].copy()
         G_val.remove_edge(u, v)
         
-        # Extract and scale features for this edge with Task #1 support
+        # Extract and scale features for this edge with enhanced support
         X_test, y_test, _ = feature_matrix_from_graph(
             G_val, 
             edges=[(u, v, data)], 
@@ -170,7 +170,7 @@ def main():
         print(f"WARNING: The training directory '{training_dir}' does not exist. Please run train_model.py first.")
         return
 
-    # Load experiment configuration (Task #1 support)
+    # Load experiment configuration
     exp_config = load_experiment_config(args.name)
     use_weighted_features = exp_config.get('use_weighted_features', False)
     weight_aggregation = exp_config.get('weight_aggregation', 'product')
@@ -204,7 +204,7 @@ def main():
         'use_weighted_features': use_weighted_features,
         'weight_aggregation': weight_aggregation
     }, out_dir)
-    print(f"\n✓ Validation results saved to {out_dir}")
+    print(f"\nSUCCESS: Validation results saved to {out_dir}")
 
 if __name__ == "__main__":
     main()

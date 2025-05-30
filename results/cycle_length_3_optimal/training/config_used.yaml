@@ -1,0 +1,5 @@
+cycle_length: 3
+experiment_name: cycle_length_3_optimal
+n_folds: 5
+use_weighted_features: false
+weight_aggregation: product
