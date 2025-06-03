@@ -1,25 +1,25 @@
 {
   "actual": {
     "default_threshold": 0.5,
-    "default_f1": 0.8953027730616865,
-    "default_accuracy": 0.815,
-    "best_f1_threshold": 0.85,
-    "best_f1": 0.9106178764247151,
-    "best_accuracy_threshold": 0.85,
-    "best_accuracy": 0.851,
-    "roc_auc": 0.7738906249999999,
-    "average_precision": 0.9153643831252914
+    "default_f1": 0.9135071090047393,
+    "default_accuracy": 0.854,
+    "best_f1_threshold": 0.2,
+    "best_f1": 0.9185705916813122,
+    "best_accuracy_threshold": 0.2,
+    "best_accuracy": 0.861,
+    "roc_auc": 0.8364531250000001,
+    "average_precision": 0.943650188980611
   },
   "random_baseline": {
     "default_threshold": 0.5,
-    "default_f1": 0.6044718581341557,
-    "default_accuracy": 0.487,
+    "default_f1": 0.5983037779491133,
+    "default_accuracy": 0.479,
     "best_f1_threshold": 0.0,
     "best_f1": 0.888888888888889,
     "best_accuracy_threshold": 0.0,
     "best_accuracy": 0.8,
-    "roc_auc": 0.4628125,
-    "average_precision": 0.7824372462978799
+    "roc_auc": 0.48223125,
+    "average_precision": 0.7847316566410903
   },
   "all_positive_baseline": {
     "default_threshold": 0.5,
@@ -33,11 +33,11 @@
     "average_precision": 0.8
   },
   "comparison": {
-    "actual_vs_random_f1_improvement": 0.021728987535826194,
-    "actual_vs_random_accuracy_improvement": 0.050999999999999934,
-    "actual_vs_random_roc_auc_improvement": 0.3110781249999999,
-    "actual_vs_all_positive_f1_improvement": 0.021728987535826194,
-    "actual_vs_all_positive_accuracy_improvement": 0.050999999999999934,
-    "actual_vs_all_positive_roc_auc_improvement": 0.27389062499999994
+    "actual_vs_random_f1_improvement": 0.029681702792423215,
+    "actual_vs_random_accuracy_improvement": 0.06099999999999994,
+    "actual_vs_random_roc_auc_improvement": 0.35422187500000013,
+    "actual_vs_all_positive_f1_improvement": 0.029681702792423215,
+    "actual_vs_all_positive_accuracy_improvement": 0.06099999999999994,
+    "actual_vs_all_positive_roc_auc_improvement": 0.33645312500000013
   }
 }

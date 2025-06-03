@@ -7,7 +7,7 @@ cycle_lengths:
 - 4
 - 5
 data_path: data/soc-sign-bitcoinotc.csv
-default_experiment_name: experiment_optimal_baseline
+default_experiment_name: pos_ratio_80_20_optimal
 default_n_folds: 5
 default_threshold: 0.5
 embeddedness_descriptions:
@@ -19,7 +19,6 @@ embeddedness_levels:
 - 1
 - 2
 enable_subset_sampling: true
-experiment_name: pos_ratio_80_20_optimal
 feature_descriptions:
   unweighted: Binary edge information only
   weighted: Uses edge weight information

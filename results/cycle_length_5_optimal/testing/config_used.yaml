@@ -1,6 +1,8 @@
 cycle_length: 5
 experiment_name: cycle_length_5_optimal
 n_folds: 5
+testing_completed: true
 threshold_type: best_accuracy_threshold
+threshold_used: 0.67
 use_weighted_features: false
 weight_aggregation: product

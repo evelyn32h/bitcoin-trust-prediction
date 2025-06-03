@@ -1,4 +1,5 @@
 cycle_length: 3
+embeddedness_note: Embeddedness filtering applied in preprocessing stage
 experiment_name: cycle_length_3_optimal
 n_folds: 5
 use_weighted_features: false

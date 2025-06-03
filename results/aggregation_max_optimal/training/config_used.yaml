@@ -1,0 +1,6 @@
+cycle_length: 4
+embeddedness_note: Embeddedness filtering applied in preprocessing stage
+experiment_name: aggregation_max_optimal
+n_folds: 5
+use_weighted_features: false
+weight_aggregation: product

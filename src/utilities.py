@@ -10,7 +10,18 @@ def print_feature_statistics(features):
     Parameters:
     features: dict mapping edge tuples to lists of feature values (one list per edge)
     """
+    if not features:
+        print("No features to analyze")
+        return
+        
     feature_matrix = np.array(list(features.values()))
+    if feature_matrix.size == 0:
+        print("Empty feature matrix")
+        return
+        
+    if feature_matrix.ndim == 1:
+        feature_matrix = feature_matrix.reshape(-1, 1)
+        
     n_features = feature_matrix.shape[1]
     print(f"Feature statistics for {n_features} features:")
     for i in range(n_features):
@@ -19,7 +30,7 @@ def print_feature_statistics(features):
         max_val = np.max(col)
         mean_val = np.mean(col)
         zero_count = np.sum(col == 0)
-        print(f"Feature {i+1}: min={min_val}, max={max_val}, mean={mean_val}, zeros={zero_count}/{len(col)}")
+        print(f"Feature {i+1}: min={min_val:.3f}, max={max_val:.3f}, mean={mean_val:.3f}, zeros={zero_count}/{len(col)}")
 
 def sample_edges_with_positive_ratio(G, sample_size, pos_ratio=0.5):
     """
@@ -144,13 +155,13 @@ def print_comparative_evaluation_metrics(comparative_results):
         
         # Assessment logic
         if f1_improvement > 0.1 and auc_improvement > 0.1:
-            assessment = "[EXCELLENT] - Model significantly outperforms baselines"
+            assessment = "🟢 EXCELLENT - Model significantly outperforms baselines"
         elif f1_improvement > 0.05 and auc_improvement > 0.05:
-            assessment = "[GOOD] - Model moderately outperforms baselines"
+            assessment = "🟡 GOOD - Model moderately outperforms baselines"
         elif f1_improvement > 0 and auc_improvement > 0:
-            assessment = "[FAIR] - Model slightly outperforms baselines"
+            assessment = "🟠 FAIR - Model slightly outperforms baselines"
         else:
-            assessment = "[POOR] - Model does not outperform baselines"
+            assessment = "🔴 POOR - Model does not outperform baselines"
         
         print(f"   Overall Assessment: {assessment}")
         
@@ -283,13 +294,13 @@ def print_comparative_test_metrics(comparative_results):
         
         # Assessment logic
         if f1_improvement > 0.1 and acc_improvement > 0.1:
-            assessment = "[EXCELLENT] - Model significantly outperforms baselines"
+            assessment = "🟢 EXCELLENT - Model significantly outperforms baselines"
         elif f1_improvement > 0.05 and acc_improvement > 0.05:
-            assessment = "[GOOD] - Model moderately outperforms baselines"
+            assessment = "🟡 GOOD - Model moderately outperforms baselines"
         elif f1_improvement > 0 and acc_improvement > 0:
-            assessment = "[FAIR] - Model slightly outperforms baselines"
+            assessment = "🟠 FAIR - Model slightly outperforms baselines"
         else:
-            assessment = "[POOR] - Model does not outperform baselines"
+            assessment = "🔴 POOR - Model does not outperform baselines"
         
         print(f"   Overall Assessment: {assessment}")
         
@@ -310,11 +321,15 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
     """
     Sample edges from a NetworkX graph with optional positive ratio and embeddedness constraints.
     
+    UPDATED: Embeddedness filtering should now be done in preprocessing stage.
+    This function maintains the min_embeddedness parameter for backward compatibility
+    but shows a deprecation warning.
+    
     Parameters:
         G (networkx.Graph): Input graph with edge attribute 'weight' indicating sign (+/-).
         sample_size (int, optional): Total number of edges to sample. If None, returns all qualifying edges.
         pos_ratio (float, optional): Desired ratio of positive edges (0 < pos_ratio < 1).
-        min_embeddedness (int, optional): Minimum number of common neighbors required.
+        min_embeddedness (int, optional): DEPRECATED - minimum number of common neighbors required.
         strict (bool): If True, only return edges meeting all requirements even if < sample_size.
     
     Returns:
@@ -323,22 +338,18 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
     random.seed(42)
     edge_list = list(G.edges(data=True))
     
-    # Filter by embeddedness if specified
+    # Warning for deprecated embeddedness parameter
     if min_embeddedness is not None:
-        G_undirected = G.to_undirected() if G.is_directed() else G
-        qualifying_edges = [
-            (u, v, data) for u, v, data in edge_list
-            if len(list(nx.common_neighbors(G_undirected, u, v))) >= min_embeddedness
-        ]
-        logger.info(f"Embeddedness filtering: {len(edge_list)} → {len(qualifying_edges)} edges")
-        
-        if not qualifying_edges:
-            if strict:
-                logger.warning("No edges meet embeddedness requirements")
-                return []
-            else:
-                logger.warning("No edges meet embeddedness requirements, using all edges")
-                qualifying_edges = edge_list
+        print(f"Warning: min_embeddedness parameter is deprecated in sample_n_edges.")
+        print("Embeddedness filtering should be done in preprocessing stage.")
+        print("This parameter will be ignored to maintain consistency with new workflow.")
+    
+    # Filter by embeddedness if specified (for backward compatibility only)
+    if min_embeddedness is not None and min_embeddedness > 0:
+        print(f"Note: Embeddedness filtering (min_embeddedness={min_embeddedness}) should be done in preprocessing.")
+        print("Proceeding without embeddedness filtering in this stage.")
+        # We skip the embeddedness filtering here as it should be done in preprocessing
+        qualifying_edges = edge_list
     else:
         qualifying_edges = edge_list
     
@@ -372,16 +383,6 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
                 add_neg = min(shortfall, len(neg_edges) - n_neg_actual)
                 n_neg_actual += add_neg
                 shortfall -= add_neg
-            
-            # If still short, use non-qualifying edges
-            if shortfall > 0:
-                non_qualifying = [e for e in edge_list if e not in qualifying_edges]
-                if non_qualifying:
-                    additional = random.sample(non_qualifying, min(shortfall, len(non_qualifying)))
-                    pos_edges.extend([e for e in additional if is_positive(e)])
-                    neg_edges.extend([e for e in additional if not is_positive(e)])
-                    n_pos_actual = min(n_pos_target + shortfall//2, len(pos_edges))
-                    n_neg_actual = min(target_size - n_pos_actual, len(neg_edges))
         
         # Warn about unmet requirements
         if n_pos_actual < n_pos_target:
@@ -398,15 +399,6 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
     else:
         # Simple sampling without ratio constraint
         available_edges = qualifying_edges
-        
-        # Fill with non-qualifying edges if needed and not strict
-        if not strict and target_size > len(available_edges):
-            non_qualifying = [e for e in edge_list if e not in qualifying_edges]
-            needed = target_size - len(available_edges)
-            if non_qualifying:
-                logger.warning(f"Adding {min(needed, len(non_qualifying))} non-qualifying edges")
-                available_edges.extend(non_qualifying[:needed])
-        
         actual_size = min(target_size, len(available_edges))
         if strict and actual_size < target_size:
             logger.warning(f"Strict mode: Only {actual_size}/{target_size} edges qualify")
@@ -415,8 +407,7 @@ def sample_n_edges(G, sample_size=None, pos_ratio=None, min_embeddedness=None, s
     
     # Single comprehensive report
     pos_count = sum(1 for e in sample if is_positive(e))
-    embeddedness_count = sum(1 for e in sample if e in qualifying_edges) if min_embeddedness is not None else len(sample)
     
-    print(f"Sampled {len(sample)} edges: {pos_count} positive, {embeddedness_count} meeting embeddedness ≥ {min_embeddedness if min_embeddedness is not None else 0}")
+    print(f"Sampled {len(sample)} edges: {pos_count} positive, {len(sample)-pos_count} negative")
     
     return sample

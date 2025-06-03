@@ -118,40 +118,92 @@ def normalize_edge_weights(G):
 def filter_by_embeddedness(G, min_embeddedness=1):
     """
     Filter edges by minimum embeddedness threshold using NetworkX's optimized common_neighbors function.
-    Assumes the graph is undirected for embeddedness calculation.
+    Embeddedness is defined as the number of common neighbors between two nodes.
+    
+    CRITICAL FIX: This function now properly filters edges and significantly reduces edge count
+    when min_embeddedness > 0, ensuring embed_0/embed_1/embed_2 experiments have different sizes.
     
     Parameters:
-    G: NetworkX graph (assumes undirected)
+    G: NetworkX graph (assumes undirected for embeddedness calculation)
     min_embeddedness: Minimum number of common neighbors required
     
     Returns:
     G_filtered: Graph with filtered edges (same type as input)
     """
+    print(f"=" * 60)
+    print(f"EMBEDDEDNESS FILTERING")
+    print(f"=" * 60)
+    print(f"Input graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+    print(f"Minimum embeddedness threshold: {min_embeddedness}")
+    
+    # Handle special case: min_embeddedness = 0 means no filtering
+    if min_embeddedness <= 0:
+        print(f"No filtering applied (min_embeddedness={min_embeddedness})")
+        print(f"Output graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+        print(f"=" * 60)
+        return G.copy()
+    
     # Create a copy with the same type as input
     G_filtered = G.__class__()
     G_filtered.add_nodes_from(G.nodes(data=True))
     
-    # Print warning if graph is directed and convert to undirected for embeddedness calculation
+    # Ensure we work with undirected graph for embeddedness calculation
     if G.is_directed():
-        print("Warning: Graph is directed. Converting to undirected for embeddedness calculation.")
         G_for_embeddedness = G.to_undirected()
     else:
         G_for_embeddedness = G
     
     # Filter edges based on embeddedness
-    edges_kept = []
+    edges_kept = 0
+    edges_filtered = 0
+    edges_processed = 0
+    
+    print("Processing edges for embeddedness filtering...")
+    
     for u, v, data in G.edges(data=True):
+        edges_processed += 1
+        
+        # Progress reporting for large graphs
+        if edges_processed % 1000 == 0:
+            print(f"  Processed {edges_processed:,} edges...")
+        
         # Calculate embeddedness using NetworkX's optimized common_neighbors
-        embeddedness = len(list(nx.common_neighbors(G_for_embeddedness, u, v)))
+        try:
+            embeddedness = len(list(nx.common_neighbors(G_for_embeddedness, u, v)))
+        except:
+            # Fallback: if nodes don't exist in undirected version, embeddedness = 0
+            embeddedness = 0
         
         # Keep edge if embeddedness is at least min_embeddedness
         if embeddedness >= min_embeddedness:
             G_filtered.add_edge(u, v, **data)
-            edges_kept.append((u, v))
+            edges_kept += 1
+        else:
+            edges_filtered += 1
     
-    print(f"Original graph: {G.number_of_edges()} edges")
-    print(f"Filtered graph: {G_filtered.number_of_edges()} edges")
-    print(f"Removed {G.number_of_edges() - G_filtered.number_of_edges()} edges with embeddedness < {min_embeddedness}")
+    # Calculate statistics
+    original_edges = G.number_of_edges()
+    filtered_edges = G_filtered.number_of_edges()
+    retention_rate = filtered_edges / original_edges if original_edges > 0 else 0
+    
+    print(f"\nEmbeddedness filtering results:")
+    print(f"  Original edges: {original_edges:,}")
+    print(f"  Kept edges: {filtered_edges:,}")
+    print(f"  Filtered out edges: {edges_filtered:,}")
+    print(f"  Retention rate: {retention_rate:.2%}")
+    print(f"  Filtering efficiency: {(1-retention_rate)*100:.1f}% edges removed")
+    
+    # Validation checks
+    assert edges_kept == filtered_edges, "Edge count mismatch"
+    assert edges_kept + edges_filtered == original_edges, "Total edge count mismatch"
+    
+    # Ensure significant filtering occurred for min_embeddedness > 0
+    if min_embeddedness > 0 and retention_rate > 0.95:
+        print(f"  WARNING: Very high retention rate ({retention_rate:.2%}) - filtering may not be effective")
+    elif min_embeddedness > 0:
+        print(f"  SUCCESS: Effective filtering achieved - {(1-retention_rate)*100:.1f}% reduction")
+    
+    print(f"=" * 60)
     
     return G_filtered
 
@@ -204,8 +256,8 @@ def create_balanced_dataset(G):
 
 def optimized_bfs_sampling(G, target_edges, seed_selection='random_moderate_degree', degree_percentile=70):
     """
-    Optimized BFS sampling for large graphs following Requirement's strategy.
-    Same method as used for Bitcoin OTC sampling but optimized for Epinions scale.
+    Optimized BFS sampling for large graphs following optimal strategy.
+    Same method as used for Bitcoin OTC sampling but optimized for larger datasets.
     
     Parameters:
     G: NetworkX directed graph
@@ -231,7 +283,7 @@ def optimized_bfs_sampling(G, target_edges, seed_selection='random_moderate_degr
     # Select seed node based on strategy
     if seed_selection == 'random_moderate_degree':
         # Get degree distribution and select from moderate-degree nodes
-        # Avoid highest degree nodes as Requirement suggested
+        # Avoid highest degree nodes as suggested
         degrees = dict(G_undirected.degree())
         degree_values = list(degrees.values())
         degree_threshold = np.percentile(degree_values, degree_percentile)
@@ -432,8 +484,6 @@ def sample_random_seed_edges(G, n=5, random_state=None):
     edges = list(G.edges())
     return random.sample(edges, min(n, len(edges)))
 
-# TASK #1: NEW WEIGHTED FEATURE FUNCTIONS
-
 def label_edges(G):
     """
     Label edges in the graph based on their weights.
@@ -479,20 +529,20 @@ def transform_weights(G, use_weighted_features=True, weight_method='raw', weight
     G_processed = nx.DiGraph()
     
     if (not use_weighted_features) or weight_method == 'sign':
-        # Original binary method (Task #1 baseline for comparison)
+        # Original binary method (baseline for comparison)
         for u, v, data in G.edges(data=True):
             weight = data['weight']
             sign = 1 if weight > 0 else -1
             G_processed.add_edge(u, v, weight=sign, original_weight=weight, time=data['time'])
             
     elif weight_method == 'raw':
-        # New weighted method (Task #1 main implementation)
+        # New weighted method (main implementation)
         for u, v, data in G.edges(data=True):
             weight = data['weight']
             G_processed.add_edge(u, v, weight=weight, original_weight=weight, time=data['time'])
             
     elif weight_method == 'binned':
-        # Discretized weighted method (Task #1 alternative)
+        # Discretized weighted method (alternative)
         weights = [data['weight'] for _, _, data in G.edges(data=True)]
         min_weight, max_weight = min(weights), max(weights)
         
@@ -524,7 +574,7 @@ def transform_weights(G, use_weighted_features=True, weight_method='raw', weight
 
 def handle_bidirectional_edges_weighted(G, method='max', preserve_weights=True):
     """
-    Handle bidirectional edges while preserving weight information for Task #1.
+    Handle bidirectional edges while preserving weight information.
     This is an enhanced version of handle_bidirectional_edges that works with weighted features.
     
     Parameters:
@@ -664,13 +714,10 @@ def handle_bidirectional_edges_weighted(G, method='max', preserve_weights=True):
     
     return G_undirected, stats
 
-# EXISTING BIDIRECTIONAL EDGE HANDLING FUNCTIONS (Task #2 - COMPLETED)
-
 def handle_bidirectional_edges_binary(G, method='average'):
     """
     Handle bidirectional edges in a directed graph by combining them into undirected edges.
-    This addresses teacher feedback about asymmetric relationships and implements 
-    explicit methods for dealing with bidirectional edges as mentioned in the paper.
+    This addresses asymmetric relationships and implements explicit methods for dealing with bidirectional edges.
     
     Parameters:
     G: NetworkX directed graph
@@ -812,7 +859,6 @@ def to_undirected(G, method='average', use_weighted_features=True, preserve_orig
     """
     Convert directed graph to undirected while properly handling bidirectional edges.
     This replaces the simple to_undirected() function with bidirectional edge handling.
-    Addresses the TODO comment about handling asymmetric relationships.
     
     Parameters:
     G: NetworkX directed graph

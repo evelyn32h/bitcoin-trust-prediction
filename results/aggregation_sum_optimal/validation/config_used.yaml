@@ -1,0 +1,8 @@
+cycle_length: 4
+experiment_name: aggregation_sum_optimal
+n_folds: 5
+pos_edges_ratio: 0.8
+predictions_per_fold: 200
+use_weighted_features: false
+validation_completed: true
+weight_aggregation: product

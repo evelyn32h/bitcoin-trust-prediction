@@ -1,0 +1,22 @@
+bidirectional_method: sum
+data_path: data/soc-sign-bitcoinotc.csv
+embeddedness_filtering_applied: preprocessing_stage
+enable_subset_sampling: true
+experiment_name: aggregation_sum_optimal
+min_train_embeddedness: 1
+n_folds: 5
+num_test_edges: 3080
+num_validation_edges: 2640
+optimal_split: true
+optimal_split_info: Using improved 74:12:14 ratio for better accuracy
+preserve_original_weights: true
+split_ratios:
+  test: 0.14
+  train: 0.74
+  validation: 0.12
+subset_preserve_structure: true
+subset_sampling_method: bfs_sampling
+target_edge_count: 35000
+use_weighted_features: false
+weight_bins: 5
+weight_method: raw

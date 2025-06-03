@@ -5,6 +5,7 @@ import numpy as np
 import os
 import joblib
 import random
+import yaml
 from collections import defaultdict
 
 def save_metrics_to_json(metrics, save_path):
@@ -40,7 +41,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
     """
     Load dataset (Bitcoin OTC or Epinions) and convert to NetworkX directed weighted graph
     Auto-detects format based on file extension or content
-    Enhanced with BFS subset sampling support following Requirement's strategy
+    Enhanced with BFS subset sampling support following project strategy
     
     Parameters:
     filepath: Path to the data file
@@ -107,7 +108,7 @@ def load_bitcoin_data(filepath, enable_subset_sampling=False, subset_config=None
 def apply_subset_sampling(df, subset_config):
     """
     Apply subset sampling to large datasets to make them comparable in size.
-    Enhanced with BFS sampling method following Requirement's strategy.
+    Enhanced with BFS sampling method following project strategy.
     
     Parameters:
     df: Original DataFrame
@@ -124,7 +125,7 @@ def apply_subset_sampling(df, subset_config):
     print(f"Target: ~{target_edge_count} edges (comparable to Bitcoin OTC)")
     
     if sampling_method == 'bfs_sampling':
-        # NEW: BFS sampling following Requirement's strategy
+        # NEW: BFS sampling following project strategy
         df_subset = sample_by_bfs_method(df, target_edge_count, subset_config)
         print(f"BFS sampling: {len(df_subset)} edges")
         
@@ -184,7 +185,7 @@ def apply_subset_sampling(df, subset_config):
 
 def sample_by_bfs_method(df, target_edge_count, subset_config):
     """
-    Apply BFS sampling following Requirement's strategy.
+    Apply BFS sampling following project strategy.
     Same method as used for Bitcoin OTC but optimized for large datasets.
     
     Parameters:
@@ -628,47 +629,80 @@ def sample_high_degree_subgraph(df, target_edge_count):
     
     return df_subset
 
-# Keep all the remaining functions from the original file unchanged
 def load_undirected_graph_from_csv(filepath):
     """
-    Load an undirected NetworkX graph from a CSV file with columns: source, target, rating, time.
+    Load an undirected NetworkX graph from a CSV file with columns: source, target, label, weight, time.
     Returns:
         G: NetworkX undirected graph
         df: DataFrame of the original data
     """
-    df = pd.read_csv(filepath, sep=',', header=None, names=['source', 'target', 'label', 'weight', 'time'])
-    G = nx.from_pandas_edgelist(df, source='source', target='target', edge_attr=['label', 'weight', 'time'], create_using=nx.Graph())
+    # Try to read with expected format first
+    try:
+        df = pd.read_csv(filepath, header=None, names=['source', 'target', 'label', 'weight', 'time'])
+    except Exception as e:
+        print(f"Warning: Could not read with expected format, trying alternative: {e}")
+        # Try reading with headers
+        df = pd.read_csv(filepath)
+        # Ensure required columns exist
+        required_cols = ['source', 'target']
+        for col in required_cols:
+            if col not in df.columns:
+                raise ValueError(f"Required column '{col}' not found in CSV")
+    
+    # Create undirected graph
+    G = nx.Graph()
+    
+    for _, row in df.iterrows():
+        # Get edge attributes
+        edge_attrs = {}
+        if 'weight' in row and not pd.isna(row['weight']):
+            edge_attrs['weight'] = row['weight']
+        if 'label' in row and not pd.isna(row['label']):
+            edge_attrs['label'] = row['label']
+        if 'time' in row and not pd.isna(row['time']):
+            edge_attrs['time'] = row['time']
+        
+        G.add_edge(row['source'], row['target'], **edge_attrs)
+    
+    print(f"Loaded graph from {filepath}: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     return G, df
 
 def save_graph_to_csv(G, filepath):
     """
-    Save a NetworkX graph to a CSV file with columns: source, target, rating, time.
-    The order and field names match the original Bitcoin OTC dataset.
+    Save a NetworkX graph to a CSV file with columns: source, target, label, weight, time.
+    The order and field names match the expected format.
     """
-    df = nx.to_pandas_edgelist(G)
-    # Ensure 'rating' and 'time' columns exist and are in the correct order
-    if 'rating' not in df:
-        df['rating'] = None
-    if 'time' not in df:
-        df['time'] = None
-    if 'label' not in df:
-        df['label'] = None
-        
-    df = df[['source', 'target', 'label', 'weight', 'time']]
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    # Convert graph to edge list
+    edge_data = []
+    for u, v, data in G.edges(data=True):
+        edge_record = {
+            'source': u,
+            'target': v,
+            'label': data.get('label', 0),
+            'weight': data.get('weight', 1),
+            'time': data.get('time', 0)
+        }
+        edge_data.append(edge_record)
+    
+    # Create DataFrame and save
+    df = pd.DataFrame(edge_data)
+    df = df[['source', 'target', 'label', 'weight', 'time']]  # Ensure column order
     df.to_csv(filepath, index=False, header=False)
+    print(f"Graph saved to {filepath}: {len(df)} edges")
 
 def save_model(model, scaler, out_dir, fold):
     """
     Saves the model and scaler to out_dir for the given fold.
-    FIXED: Correctly save both model and scaler to their respective files.
     """
     os.makedirs(out_dir, exist_ok=True)
     model_path = os.path.join(out_dir, f'model_fold_{fold}.joblib')
     scaler_path = os.path.join(out_dir, f'scaler_fold_{fold}.joblib')
     
-    # FIXED: Save model to model_path and scaler to scaler_path
-    joblib.dump(model, model_path)      # Save model
-    joblib.dump(scaler, scaler_path)    # Save scaler
+    joblib.dump(model, model_path)
+    joblib.dump(scaler, scaler_path)
     
     print(f"Saved model and scaler for fold {fold} to {out_dir}")
     print(f"  Model: {model_path}")
@@ -679,14 +713,20 @@ def load_models(training_dir, n_folds):
     Loads models and scalers from training_dir, one per fold.
     Returns a list of (model, scaler) tuples.
     """
-    import os
     models_and_scalers = []
     for i in range(n_folds):
         model_path = os.path.join(training_dir, f'model_fold_{i}.joblib')
         scaler_path = os.path.join(training_dir, f'scaler_fold_{i}.joblib')
-        model = joblib.load(model_path)
-        scaler = joblib.load(scaler_path)
-        models_and_scalers.append((model, scaler))
+        
+        if os.path.exists(model_path) and os.path.exists(scaler_path):
+            model = joblib.load(model_path)
+            scaler = joblib.load(scaler_path)
+            models_and_scalers.append((model, scaler))
+        else:
+            print(f"Warning: Model or scaler files not found for fold {i}")
+            print(f"  Expected: {model_path}")
+            print(f"  Expected: {scaler_path}")
+            models_and_scalers.append((None, None))
     return models_and_scalers
     
 def save_prediction_results(true_labels, predicted_labels, predicted_probabilities, out_dir):
@@ -700,7 +740,9 @@ def save_prediction_results(true_labels, predicted_labels, predicted_probabiliti
         "predicted_label": predicted_labels,
         "predicted_probability": predicted_probabilities
     })
-    df.to_csv(os.path.join(out_dir, "prediction_results.csv"), index=False)    
+    filepath = os.path.join(out_dir, "prediction_results.csv")
+    df.to_csv(filepath, index=False)
+    print(f"Prediction results saved to {filepath}")
 
 def load_prediction_results(out_dir):
     """
@@ -717,12 +759,10 @@ def load_prediction_results(out_dir):
 def save_metrics(metrics, out_dir):
     """
     Save a (possibly nested) metrics dictionary as a JSON file at the given path.
-    FIXED: Now saves as .json file with JSON content (was .csv with JSON content)
     """
     os.makedirs(out_dir, exist_ok=True)
-    file_path = os.path.join(out_dir, "metrics.json")  # Changed from .csv to .json
-    with open(file_path, 'w') as f:
-        json.dump(metrics, f, indent=2)
+    file_path = os.path.join(out_dir, "metrics.json")
+    save_metrics_to_json(metrics, file_path)
         
 def load_metrics(metrics_path):
     """
@@ -736,12 +776,11 @@ def save_config(config_dict, out_dir, filename="config_used.yaml"):
     """
     Save a configuration dictionary as a YAML file in the specified directory.
     """
-    import yaml
     os.makedirs(out_dir, exist_ok=True)
     config_path = os.path.join(out_dir, filename)
     with open(config_path, 'w') as f:
-        yaml.dump(config_dict, f)
-    print(f"Saved config to {config_path}")
+        yaml.dump(config_dict, f, default_flow_style=False)
+    print(f"Config saved to {config_path}")
 
 if __name__ == "__main__":
     # Test BFS sampling
@@ -759,7 +798,7 @@ if __name__ == "__main__":
         else:
             data_path = bitcoin_path
     
-    # Test with BFS sampling (following Requirement's strategy)
+    # Test with BFS sampling (following project strategy)
     subset_config = {
         'subset_sampling_method': 'bfs_sampling',
         'target_edge_count': 35000,

@@ -1,25 +1,25 @@
 {
   "actual": {
     "default_threshold": 0.5,
-    "default_f1": 0.8953027730616865,
-    "default_accuracy": 0.815,
-    "best_f1_threshold": 0.85,
-    "best_f1": 0.9106178764247151,
-    "best_accuracy_threshold": 0.85,
-    "best_accuracy": 0.851,
-    "roc_auc": 0.7738906249999999,
-    "average_precision": 0.9153643831252914
+    "default_f1": 0.9264173703256937,
+    "default_accuracy": 0.878,
+    "best_f1_threshold": 0.25,
+    "best_f1": 0.9290399522957662,
+    "best_accuracy_threshold": 0.25,
+    "best_accuracy": 0.881,
+    "roc_auc": 0.8864124999999999,
+    "average_precision": 0.9609226325614438
   },
   "random_baseline": {
     "default_threshold": 0.5,
-    "default_f1": 0.599845797995374,
-    "default_accuracy": 0.481,
+    "default_f1": 0.6075558982266769,
+    "default_accuracy": 0.491,
     "best_f1_threshold": 0.0,
     "best_f1": 0.888888888888889,
     "best_accuracy_threshold": 0.0,
     "best_accuracy": 0.8,
-    "roc_auc": 0.47050625,
-    "average_precision": 0.7837442767704816
+    "roc_auc": 0.48331874999999996,
+    "average_precision": 0.7960987058763462
   },
   "all_positive_baseline": {
     "default_threshold": 0.5,
@@ -33,11 +33,11 @@
     "average_precision": 0.8
   },
   "comparison": {
-    "actual_vs_random_f1_improvement": 0.021728987535826194,
-    "actual_vs_random_accuracy_improvement": 0.050999999999999934,
-    "actual_vs_random_roc_auc_improvement": 0.30338437499999993,
-    "actual_vs_all_positive_f1_improvement": 0.021728987535826194,
-    "actual_vs_all_positive_accuracy_improvement": 0.050999999999999934,
-    "actual_vs_all_positive_roc_auc_improvement": 0.27389062499999994
+    "actual_vs_random_f1_improvement": 0.04015106340687724,
+    "actual_vs_random_accuracy_improvement": 0.08099999999999996,
+    "actual_vs_random_roc_auc_improvement": 0.40309375,
+    "actual_vs_all_positive_f1_improvement": 0.04015106340687724,
+    "actual_vs_all_positive_accuracy_improvement": 0.08099999999999996,
+    "actual_vs_all_positive_roc_auc_improvement": 0.38641249999999994
   }
 }

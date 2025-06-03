@@ -1,0 +1,8 @@
+cycle_length: 4
+experiment_name: aggregation_stronger_optimal
+n_folds: 5
+testing_completed: true
+threshold_type: best_accuracy_threshold
+threshold_used: 0.0
+use_weighted_features: false
+weight_aggregation: product

@@ -1,7 +1,9 @@
 bidirectional_method: max
 data_path: data/soc-sign-bitcoinotc.csv
+embeddedness_filtering_applied: preprocessing_stage
 enable_subset_sampling: true
 experiment_name: pos_ratio_90_10_optimal
+min_train_embeddedness: 1
 n_folds: 5
 num_test_edges: 3080
 num_validation_edges: 2640

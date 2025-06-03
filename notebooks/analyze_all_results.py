@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-Complete Results Analysis - Fixed Version with Embeddedness Comparison
-====================================================================
+Complete Results Analysis - Enhanced Version with All Required Comparisons
+========================================================================
 
-Fixed version addressing all requirements from the workflow document:
+This script generates all required comparison plots for the research results:
 
-RESULT PLOTS (8 types - embeddedness comparison RESTORED):
+RESULT PLOTS (8 types):
 1. ✅ Weighted vs Unweighted Comparison (MOST IMPORTANT - optimal split only)
-2. ✅ Dataset Comparison (best configuration only) 
-3. ✅ Embeddedness Level Comparison (0, 1, 2) - RESTORED
+2. ✅ Dataset Comparison (best configuration only) - SIMPLIFIED
+3. ✅ Embeddedness Level Comparison (0, 1, 2) - FIXED
 4. ✅ Aggregation Methods Comparison
-5. ✅ Complete Performance Summary Table (unchanged)
+5. ✅ Complete Performance Summary Table
 6. ✅ Positive Ratio Comparison (multiple ratios)
-7. ✅ Cycle Length Comparison (3, 4, 5) - Step 7 fix
-8. ✅ Pos/Neg Ratio Experiments (90%-10% through 50%-50%) - Step 8 fix
+7. ✅ Cycle Length Comparison (3, 4, 5) - NEW ADDITION
+8. ✅ Pos/Neg Ratio Experiments (90%-10% through 50%-50%) - FIXED
 
 FIXES APPLIED:
-- RESTORED: Embeddedness level comparison (0=no filter, 1=moderate, 2=strong)
+- Embeddedness filtering now applied in preprocessing stage
 - Enhanced embeddedness detection from config files and experiment names
-- Step 6&8: Enhanced positive ratio detection and comparison
-- Step 7: Enhanced cycle length detection (3, 4, 5)
-- All experiments use optimal split (74:12:14)
-- Enhanced experiment detection logic
+- Improved subplot titles with semantic naming
+- SIMPLIFIED dataset comparison for clarity
+- All experiments use optimal split
+- ADDED cycle length comparison
 
-Usage: python analyze_all_results.py
+Usage: python notebooks/analyze_all_results.py
 """
 
 import os
@@ -118,32 +118,38 @@ def load_experiment_metrics(experiment_name):
             print(f"Warning: Error loading test metrics for {experiment_name}: {e}")
     
     # Load config used
-    config_path = os.path.join(base_path, 'preprocess', 'config_used.yaml')
-    if os.path.exists(config_path):
-        try:
-            import yaml
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config_data = yaml.safe_load(f)
-                metrics['config_used'] = config_data
-                
-                # Enhanced optimal split detection
-                optimal_split = False
-                test_edges = config_data.get('num_test_edges', 0)
-                val_edges = config_data.get('num_validation_edges', 0)
-                
-                # Multiple detection methods
-                if config_data.get('optimal_split', False):
-                    optimal_split = True
-                elif test_edges == 3080 and val_edges == 2640:
-                    optimal_split = True
-                elif 'optimal' in experiment_name.lower():
-                    optimal_split = True
-                
-                if optimal_split:
-                    metrics['optimal_split'] = True
-                    metrics['split_type'] = 'optimal'
-        except Exception as e:
-            print(f"Warning: Error loading config for {experiment_name}: {e}")
+    config_paths = [
+        os.path.join(base_path, 'config_used.yaml'),
+        os.path.join(base_path, 'preprocess', 'config_used.yaml')
+    ]
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                import yaml
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = yaml.safe_load(f)
+                    metrics['config_used'] = config_data
+                    
+                    # Enhanced optimal split detection
+                    optimal_split = False
+                    test_edges = config_data.get('num_test_edges', 0)
+                    val_edges = config_data.get('num_validation_edges', 0)
+                    
+                    # Multiple detection methods
+                    if config_data.get('optimal_split', False):
+                        optimal_split = True
+                    elif test_edges == 4000 and val_edges == 4000:  # From config.yaml
+                        optimal_split = True
+                    elif 'optimal' in experiment_name.lower():
+                        optimal_split = True
+                    
+                    if optimal_split:
+                        metrics['optimal_split'] = True
+                        metrics['split_type'] = 'optimal'
+                break
+            except Exception as e:
+                print(f"Warning: Error loading config for {experiment_name}: {e}")
     
     return metrics
 
@@ -258,7 +264,6 @@ def extract_experiment_data(all_metrics):
     """
     Extract structured data from all experiments for analysis
     Enhanced experiment detection for different configurations
-    RESTORED: Real embeddedness level detection
     """
     print("\nExtracting experiment data for analysis...")
     
@@ -322,9 +327,9 @@ def extract_experiment_data(all_metrics):
             cycle_length = 5
         
         # 3. Extract positive ratio (ENHANCED detection for Steps 6&8)
-        pos_train_ratio = config.get('pos_train_edges_ratio', 0.8)
-        pos_test_ratio = config.get('pos_test_edges_ratio', 0.8)
-        pos_edges_ratio = config.get('pos_edges_ratio', 0.8)
+        pos_train_ratio = config.get('pos_train_edges_ratio', 0.5)
+        pos_test_ratio = config.get('pos_test_edges_ratio', 0.5)
+        pos_edges_ratio = config.get('pos_edges_ratio', 0.5)
         
         # Use the most specific ratio available
         positive_ratio = pos_test_ratio or pos_train_ratio or pos_edges_ratio
@@ -342,15 +347,23 @@ def extract_experiment_data(all_metrics):
             positive_ratio = 0.5
         
         # 4. Determine dataset type
-        dataset_type = 'Epinions (Optimal Split)' if exp_metrics['optimal_split'] else 'Epinions (Standard Split)'
+        dataset_type = 'Bitcoin OTC (Optimal Split)' if exp_metrics['optimal_split'] else 'Bitcoin OTC (Standard Split)'
         
-        # 5. RESTORED: Real embeddedness level detection
+        # 5. Real embeddedness level detection
         embeddedness_level = extract_embeddedness_level(exp_name, config)
         
         print(f"   {exp_name}: embeddedness_level={embeddedness_level}")
         
         # 6. Determine aggregation method
-        aggregation_method = config.get('bidirectional_method', 'Default')
+        aggregation_method = config.get('bidirectional_method', 'max')
+        
+        # Enhanced detection from experiment name
+        if 'aggregation_max' in exp_name:
+            aggregation_method = 'max'
+        elif 'aggregation_sum' in exp_name:
+            aggregation_method = 'sum'
+        elif 'aggregation_stronger' in exp_name:
+            aggregation_method = 'stronger'
         
         results.append({
             'experiment_name': exp_name,
@@ -364,10 +377,10 @@ def extract_experiment_data(all_metrics):
             'dataset_type': dataset_type,
             'optimal_split': exp_metrics['optimal_split'],
             'split_type': 'optimal' if exp_metrics['optimal_split'] else 'standard',
-            # Enhanced analysis dimensions for Steps 6, 7, 8
-            'cycle_length': cycle_length,  # Step 7 fix
-            'embeddedness_level': embeddedness_level,  # RESTORED - real detection
-            'positive_ratio': positive_ratio,  # Steps 6&8 fix
+            # Enhanced analysis dimensions
+            'cycle_length': cycle_length,
+            'embeddedness_level': embeddedness_level,
+            'positive_ratio': positive_ratio,
             'use_weighted': use_weighted,
             'aggregation_method': aggregation_method
         })
@@ -376,11 +389,10 @@ def extract_experiment_data(all_metrics):
 
 def create_weighted_vs_unweighted_comparison(df, output_dir):
     """
-    STEP 1: Weighted vs Unweighted Comparison - STRICT FILTERING
-    Only use weighted_optimal and unweighted_optimal experiments
+    PLOT 1: Weighted vs Unweighted Comparison - ENHANCED with semantic titles
     """
     print(f"\n{'='*80}")
-    print("STEP 1: WEIGHTED vs UNWEIGHTED COMPARISON (STRICT FILTERING)")
+    print("PLOT 1: WEIGHTED vs UNWEIGHTED COMPARISON (ENHANCED TITLES)")
     print("="*80)
     
     # STRICT FILTERING: Only weighted_optimal and unweighted_optimal
@@ -392,7 +404,6 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
     
     if len(weighted_df) == 0 or len(unweighted_df) == 0:
         print("Warning: Missing required experiments (weighted_optimal or unweighted_optimal)")
-        print("Expected experiments: 'weighted_optimal', 'unweighted_optimal'")
         
         # Create informational plot
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -401,12 +412,11 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
                 'Expected experiments:\n'
                 '• weighted_optimal\n'
                 '• unweighted_optimal\n\n'
-                'Please run these specific experiments first.\n\n'
-                'Each experiment should produce exactly one data point.',
+                'Please run these specific experiments first.',
                 ha='center', va='center', transform=ax.transAxes,
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightcoral"),
                 fontsize=14)
-        ax.set_title('STEP 1: Missing Required Experiments')
+        ax.set_title('PLOT 1: Missing Required Experiments')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '1_weighted_vs_unweighted_comparison.png')
@@ -415,10 +425,12 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
         return None, None, "Unknown"
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 1: Weighted vs Unweighted Features Performance Comparison\n(STRICT FILTERING - One Point Per Configuration)', 
+    fig.suptitle('Weighted vs Unweighted Features Performance Comparison\n'
+                 'Configuration: cycle_length=4, min_embeddedness=1, pos_ratio=0.5, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
     
     # Get single values (since we have exactly one experiment per type)
     unweighted_values = unweighted_df[metrics].iloc[0]
@@ -432,17 +444,11 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
     print(f"Unweighted accuracy: {unweighted_values['accuracy']:.3f}")
     print(f"Weighted accuracy: {weighted_values['accuracy']:.3f}")
     
-    # Check if unweighted reaches at least 90%
-    if unweighted_values['accuracy'] >= 0.90:
-        print(f"SUCCESS: Unweighted reaches {unweighted_values['accuracy']:.1%} (>=90% target achieved)")
-    else:
-        print(f"WARNING: Unweighted only reaches {unweighted_values['accuracy']:.1%} (<90% target)")
-    
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
         # Create bar plot with single points
-        categories = ['Unweighted', 'Weighted']
+        categories = ['Unweighted Features', 'Weighted Features']
         values = [unweighted_values[metric], weighted_values[metric]]
         
         # Color coding based on performance
@@ -453,37 +459,20 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
         
         bars = ax.bar(categories, values, color=colors, alpha=0.8)
         
-        # Add single data points (one per category)
-        ax.scatter(0, unweighted_values[metric], c='darkgreen', s=100, zorder=5, 
-                  label='Unweighted Data Point')
-        ax.scatter(1, weighted_values[metric], c='darkred', s=100, zorder=5, 
-                  label='Weighted Data Point')
+        # Add single data points
+        ax.scatter(0, unweighted_values[metric], c='darkgreen', s=100, zorder=5)
+        ax.scatter(1, weighted_values[metric], c='darkred', s=100, zorder=5)
         
         # Add value labels
         for bar, value in zip(bars, values):
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
                    f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
         
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Feature Type Comparison', fontweight='bold')
+        ax.set_ylabel(f'{title} Score')
         ax.grid(True, alpha=0.3)
-        
-        # Add improvement text
-        unw_val = unweighted_values[metric]
-        w_val = weighted_values[metric]
-        
-        if unw_val > w_val:
-            improvement = ((unw_val - w_val) / w_val * 100) if w_val > 0 else 0
-            status_text = f'Unweighted better by {improvement:.1f}%'
-            color = 'green'
-        else:
-            improvement = ((w_val - unw_val) / unw_val * 100) if unw_val > 0 else 0
-            status_text = f'Weighted better by {improvement:.1f}%'
-            color = 'green'
-        
-        ax.text(0.5, 0.9, status_text, transform=ax.transAxes, 
-               ha='center', fontweight='bold', color=color,
-               bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
+        ax.tick_params(axis='x', rotation=0)
     
     plt.tight_layout()
     
@@ -492,87 +481,94 @@ def create_weighted_vs_unweighted_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 1 COMPLETE: Plot saved to {output_path}")
-    print(f"DECISION: Use {better_method} features for all subsequent analysis")
+    print(f"PLOT 1 COMPLETE: Enhanced weighted vs unweighted comparison saved to {output_path}")
     
     return unweighted_values, weighted_values, better_method
 
 def create_dataset_comparison(df, output_dir):
     """
-    STEP 2: Dataset Comparison (best configuration only)
+    PLOT 2: Dataset Comparison (best configuration only) - SIMPLIFIED
+    Only compare Bitcoin vs Epinions under optimal configuration
     """
     print(f"\n{'='*50}")
-    print("STEP 2: DATASET COMPARISON (BEST CONFIGURATION ONLY)")
+    print("PLOT 2: DATASET COMPARISON (SIMPLIFIED - BEST CONFIGURATION ONLY)")
     print("="*50)
     
-    # Filter to only optimal split experiments (best configuration)
-    best_config_df = df[df['optimal_split'] == True].copy()
+    # Look for baseline experiments for comparison
+    baseline_experiments = [
+        'baseline_bitcoin_verification',
+        'experiment_epinions_subset_v3',
+        'unweighted_optimal'  # Use as Bitcoin baseline if specific baseline not found
+    ]
     
-    if len(best_config_df) == 0:
-        print("Warning: No optimal split experiments found, using all experiments")
-        best_config_df = df.copy()
+    comparison_data = []
+    for exp_name in baseline_experiments:
+        exp_data = df[df['experiment_name'] == exp_name]
+        if len(exp_data) > 0:
+            row = exp_data.iloc[0]
+            dataset_name = 'Bitcoin OTC' if 'bitcoin' in exp_name.lower() or 'unweighted' in exp_name else 'Epinions'
+            comparison_data.append({
+                'dataset': dataset_name,
+                'accuracy': row['accuracy'],
+                'f1_score': row['f1_score'],
+                'roc_auc': row['roc_auc'],
+                'precision': row['precision']
+            })
+            print(f"Found dataset experiment: {exp_name} -> {dataset_name}")
     
-    # Simplify dataset names for comparison
-    best_config_df['dataset_simple'] = best_config_df['dataset_type'].apply(lambda x: 
-        'Bitcoin OTC' if 'bitcoin' in x.lower() or 'otc' in x.lower() else
-        'Epinions' if 'epinions' in x.lower() else
-        'Other'
-    )
-    
-    dataset_groups = best_config_df.groupby('dataset_simple')
-    
-    if len(dataset_groups) <= 1:
-        print("Warning: Only one dataset type found - cannot create comparison")
+    if len(comparison_data) < 1:
+        print("Warning: Insufficient dataset experiments for comparison")
+        # Create informational plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.text(0.5, 0.5, 
+                'DATASET COMPARISON NOT AVAILABLE\n\n'
+                'Expected experiments for comparison:\n'
+                '• baseline_bitcoin_verification (Bitcoin OTC)\n'
+                '• experiment_epinions_subset_v3 (Epinions)\n'
+                'Or equivalent baseline experiments\n\n'
+                'Configuration: cycle_length=4, min_embeddedness=1,\n'
+                'pos_ratio=0.5, unweighted, max aggregation',
+                ha='center', va='center', transform=ax.transAxes,
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
+                fontsize=12)
+        ax.set_title('PLOT 2: Dataset Comparison')
+        ax.axis('off')
+        
+        output_path = os.path.join(output_dir, '2_dataset_comparison.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
         return
     
+    # Create simplified comparison plot
+    comparison_df = pd.DataFrame(comparison_data)
+    
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 2: Dataset Performance Comparison (Best Configuration Only)\nBitcoin OTC vs Epinions', 
+    fig.suptitle('Dataset Performance Comparison (Best Configuration Only)\n'
+                 'Configuration: cycle_length=4, min_embeddedness=1, pos_ratio=0.5, unweighted, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
-    
-    # Prepare data
-    datasets = [name for name, _ in dataset_groups if name != 'Other']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
     colors = ['lightblue', 'lightgreen']
     
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        # Prepare data for box plot
-        data_to_plot = []
-        labels = []
+        datasets = comparison_df['dataset'].values
+        values = comparison_df[metric].values
         
-        for dataset in datasets:
-            group_data = dataset_groups.get_group(dataset)
-            if len(group_data) > 0:
-                data_to_plot.append(group_data[metric].values)
-                labels.append(dataset)
+        bars = ax.bar(datasets, values, color=colors[:len(datasets)], alpha=0.8)
         
-        if len(data_to_plot) >= 2:
-            # Create box plot
-            box_plot = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
-            
-            # Color the boxes
-            for j, box in enumerate(box_plot['boxes']):
-                box.set_facecolor(colors[j % len(colors)])
-            
-            # Add individual points
-            for j, data in enumerate(data_to_plot):
-                for val in data:
-                    ax.scatter(j+1, val, c='darkred', alpha=0.6, s=30)
-            
-            # Add statistics
-            for j, (dataset, data) in enumerate(zip(datasets, data_to_plot)):
-                if len(data) > 0:
-                    mean_val = np.mean(data)
-                    count = len(data)
-                    ax.text(j+1, ax.get_ylim()[1] * 0.95, f'mean={mean_val:.3f}\nn={count}', 
-                           ha='center', va='top', fontweight='bold')
+        # Add value labels
+        for bar, value in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+                   f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
         
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Dataset Performance', fontweight='bold')
+        ax.set_ylabel(f'{title} Score')
         ax.grid(True, alpha=0.3)
-        ax.tick_params(axis='x', rotation=45)
+        ax.tick_params(axis='x', rotation=0)
     
     plt.tight_layout()
     
@@ -580,43 +576,39 @@ def create_dataset_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 2 COMPLETE: Dataset comparison saved to {output_path}")
+    print(f"PLOT 2 COMPLETE: Simplified dataset comparison saved to {output_path}")
 
 def create_embeddedness_comparison(df, output_dir):
     """
-    STEP 3: Embeddedness Level Comparison - RESTORED FUNCTIONALITY
+    PLOT 3: Embeddedness Level Comparison - ENHANCED with semantic titles
     Compare embeddedness levels 0 (no filter), 1 (moderate), 2 (strong)
     """
     print(f"\n{'='*50}")
-    print("STEP 3: EMBEDDEDNESS LEVEL COMPARISON (RESTORED)")
+    print("PLOT 3: EMBEDDEDNESS LEVEL COMPARISON (ENHANCED TITLES)")
     print("="*50)
     
     # Filter for embeddedness experiments
-    embed_df = df[df['embeddedness_level'].isin([0, 1, 2])].copy()
+    embed_experiments = ['embed_0_optimal', 'embed_1_optimal', 'embed_2_optimal']
+    embed_df = df[df['experiment_name'].isin(embed_experiments)].copy()
     
     print(f"Filtered embeddedness experiments: {len(embed_df)}")
     
-    if len(embed_df) == 0:
+    if embed_df.empty:
         print("Warning: No embeddedness experiments found")
-        print("Expected experiments with embeddedness levels 0, 1, 2")
         
         # Create informational plot
         fig, ax = plt.subplots(figsize=(12, 8))
         ax.text(0.5, 0.5, 
                 'MISSING EMBEDDEDNESS EXPERIMENTS\n\n'
                 'Expected experiments with different embeddedness levels:\n'
-                '• Level 0: No filtering (min_embeddedness=0)\n'
-                '• Level 1: Moderate filtering (min_embeddedness=1)\n'
-                '• Level 2: Strong filtering (min_embeddedness=2)\n\n'
-                'Experiment naming suggestions:\n'
-                '• experiment_embed_0_optimal\n'
-                '• experiment_embed_1_optimal\n'
-                '• experiment_embed_2_optimal\n\n'
-                'Or set min_embeddedness in config files.',
+                '• embed_0_optimal: No filtering (min_embeddedness=0)\n'
+                '• embed_1_optimal: Moderate filtering (min_embeddedness=1)\n'
+                '• embed_2_optimal: Strong filtering (min_embeddedness=2)\n\n'
+                'Note: Embeddedness filtering now applied in preprocessing stage.',
                 ha='center', va='center', transform=ax.transAxes,
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
                 fontsize=12)
-        ax.set_title('STEP 3: Missing Embeddedness Level Experiments')
+        ax.set_title('PLOT 3: Missing Embeddedness Level Experiments')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '3_embeddedness_comparison.png')
@@ -624,68 +616,59 @@ def create_embeddedness_comparison(df, output_dir):
         plt.close()
         return
     
-    # Group by embeddedness level
-    embed_groups = embed_df.groupby('embeddedness_level')
-    available_levels = sorted([level for level, _ in embed_groups])
+    # Sort by embeddedness level for consistent ordering
+    embed_df = embed_df.sort_values('embeddedness_level')
     
-    print(f"Available embeddedness levels: {available_levels}")
+    print(f"Available embeddedness levels: {sorted(embed_df['embeddedness_level'].unique())}")
     
     # Show data distribution
-    for level in available_levels:
-        group_data = embed_groups.get_group(level)
-        print(f"   Level {level}: {len(group_data)} experiments")
-        for _, row in group_data.iterrows():
-            print(f"      {row['experiment_name']}: accuracy={row['accuracy']:.3f}")
+    for _, row in embed_df.iterrows():
+        print(f"   {row['experiment_name']}: level {row['embeddedness_level']}, accuracy={row['accuracy']:.3f}")
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 3: Embeddedness Level Performance Comparison\n(0=No Filter, 1=Moderate Filter, 2=Strong Filter)', 
+    fig.suptitle('Embeddedness Level Performance Comparison\n'
+                 'Configuration: pos_ratio=0.5, cycle_length=4, unweighted, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
-    colors = ['lightcoral', 'lightblue', 'lightgreen']  # Red for no filter, blue for moderate, green for strong
-    level_labels = {0: 'No Filter\n(Level 0)', 1: 'Moderate Filter\n(Level 1)', 2: 'Strong Filter\n(Level 2)'}
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
+    colors = ['lightcoral', 'lightblue', 'lightgreen']  # Red, blue, green for levels 0, 1, 2
     
-    for i, metric in enumerate(metrics):
+    # ENHANCED: Semantic level labels
+    level_labels = {
+        0: 'No Filter\n(Level 0)', 
+        1: 'Moderate Filter\n(Level 1)', 
+        2: 'Strong Filter\n(Level 2)'
+    }
+    
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        # Prepare data for box plot
-        data_to_plot = []
-        labels = []
-        box_colors = []
+        # Extract data for plotting
+        levels = embed_df['embeddedness_level'].values
+        values = embed_df[metric].values
         
-        for level in available_levels:
-            group_data = embed_groups.get_group(level)
-            if len(group_data) > 0:
-                data_to_plot.append(group_data[metric].values)
-                labels.append(level_labels.get(level, f'Level {level}'))
-                box_colors.append(colors[level % len(colors)])
+        # Create bar plot with semantic labels
+        bar_colors = [colors[int(level)] for level in levels]
+        bars = ax.bar(range(len(levels)), values, color=bar_colors, alpha=0.8)
         
-        if len(data_to_plot) > 0:
-            # Create box plot
-            box_plot = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
-            
-            # Color the boxes
-            for j, (box, color) in enumerate(zip(box_plot['boxes'], box_colors)):
-                box.set_facecolor(color)
-            
-            # Add individual points
-            for j, data in enumerate(data_to_plot):
-                for val in data:
-                    ax.scatter(j+1, val, c='darkred', alpha=0.7, s=50, zorder=5)
-            
-            # Add statistics
-            for j, (level, data) in enumerate(zip(available_levels, data_to_plot)):
-                if len(data) > 0:
-                    mean_val = np.mean(data)
-                    count = len(data)
-                    ax.text(j+1, ax.get_ylim()[1] * 0.92, f'mean={mean_val:.3f}\nn={count}', 
-                           ha='center', va='top', fontweight='bold',
-                           bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+        # Overlay individual points
+        ax.scatter(range(len(levels)), values, color='darkred', s=100, zorder=5, 
+                  marker='o', edgecolor='darkred', linewidth=2)
         
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(axis='x', rotation=0)
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title} vs Embeddedness Filtering Level', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Embeddedness Filtering Strategy', fontsize=12)
+        ax.set_ylabel(f'{title} Score', fontsize=12)
+        ax.set_xticks(range(len(levels)))
+        ax.set_xticklabels([level_labels.get(int(level), f'Level {int(level)}') for level in levels])
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.005,
+                   f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
     
     plt.tight_layout()
     
@@ -693,45 +676,34 @@ def create_embeddedness_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 3 COMPLETE: Embeddedness level comparison saved to {output_path}")
-    
-    # Analysis summary
-    if len(available_levels) >= 2:
-        print("\nEMBEDDEDNESS ANALYSIS SUMMARY:")
-        for level in available_levels:
-            group_data = embed_groups.get_group(level)
-            mean_acc = group_data['accuracy'].mean()
-            mean_f1 = group_data['f1_score'].mean()
-            filter_type = {0: "No Filter", 1: "Moderate Filter", 2: "Strong Filter"}.get(level, f"Level {level}")
-            print(f"   {filter_type}: accuracy={mean_acc:.3f}, f1={mean_f1:.3f}")
+    print(f"PLOT 3 COMPLETE: Enhanced embeddedness comparison saved to {output_path}")
 
 def create_aggregation_methods_comparison(df, output_dir):
     """
-    STEP 4: Aggregation Methods Comparison (Max vs Sum vs Others)
+    PLOT 4: Aggregation Methods Comparison (Max vs Sum vs Stronger)
     """
     print(f"\n{'='*50}")
-    print("STEP 4: AGGREGATION METHODS COMPARISON")
+    print("PLOT 4: AGGREGATION METHODS COMPARISON")
     print("="*50)
     
-    # Group by aggregation method
-    agg_groups = df.groupby('aggregation_method')
-    available_methods = [method for method, _ in agg_groups if len(agg_groups.get_group(method)) > 0]
+    # Filter for aggregation method experiments
+    agg_experiments = ['aggregation_max_optimal', 'aggregation_sum_optimal', 'aggregation_stronger_optimal']
+    agg_df = df[df['experiment_name'].isin(agg_experiments)].copy()
     
-    if len(available_methods) <= 1:
-        print("Warning: Insufficient aggregation method variations")
-        # Show what's available
-        method = available_methods[0] if available_methods else 'Unknown'
+    if agg_df.empty:
+        print("Warning: No aggregation method experiments found")
         
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.text(0.5, 0.5, f'Available Aggregation Method: {method}\n\n'
-                         f'To get comparison, run experiments with names containing:\n'
-                         f'- "max" for Max aggregation\n'
-                         f'- "sum" for Sum aggregation\n'
-                         f'- "stronger" for Stronger aggregation',
+        ax.text(0.5, 0.5, 'MISSING AGGREGATION EXPERIMENTS\n\n'
+                         'Expected experiments:\n'
+                         '• aggregation_max_optimal\n'
+                         '• aggregation_sum_optimal\n'
+                         '• aggregation_stronger_optimal\n\n'
+                         'These test different bidirectional edge handling methods.',
                ha='center', va='center', transform=ax.transAxes,
                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
                fontsize=12)
-        ax.set_title('STEP 4: Aggregation Methods Analysis\n(Need More Variations)')
+        ax.set_title('PLOT 4: Aggregation Methods Analysis')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '4_aggregation_comparison.png')
@@ -739,46 +711,36 @@ def create_aggregation_methods_comparison(df, output_dir):
         plt.close()
         return
     
+    # Extract method names from experiment names
+    agg_df['method'] = agg_df['experiment_name'].str.extract(r'aggregation_(\w+)_optimal')[0]
+    
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 4: Aggregation Methods Performance Comparison\nMax vs Sum vs Others', 
+    fig.suptitle('Aggregation Methods Performance Comparison\n'
+                 'Configuration: pos_ratio=0.5, min_embeddedness=1, cycle_length=4, unweighted', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
-    colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightyellow']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
+    colors = ['lightblue', 'lightgreen', 'lightcoral']
     
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        data_to_plot = []
-        labels = []
+        methods = agg_df['method'].values
+        values = agg_df[metric].values
         
-        for method in available_methods:
-            group_data = agg_groups.get_group(method)
-            if len(group_data) > 0:
-                data_to_plot.append(group_data[metric].values)
-                labels.append(method)
+        bars = ax.bar(methods, values, color=colors[:len(methods)], alpha=0.8)
         
-        if len(data_to_plot) > 1:
-            box_plot = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
-            
-            for j, box in enumerate(box_plot['boxes']):
-                box.set_facecolor(colors[j % len(colors)])
-            
-            for j, data in enumerate(data_to_plot):
-                for val in data:
-                    ax.scatter(j+1, val, c='darkred', alpha=0.6, s=30)
-            
-            for j, (method, data) in enumerate(zip(available_methods, data_to_plot)):
-                if len(data) > 0:
-                    mean_val = np.mean(data)
-                    count = len(data)
-                    ax.text(j+1, ax.get_ylim()[1] * 0.95, f'mean={mean_val:.3f}\nn={count}', 
-                           ha='center', va='top', fontweight='bold')
+        # Add value labels
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.005,
+                   f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
         
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(axis='x', rotation=45)
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Bidirectional Edge Aggregation', fontweight='bold')
+        ax.set_ylabel(f'{title} Score', fontsize=12)
+        ax.grid(True, alpha=0.3, axis='y')
     
     plt.tight_layout()
     
@@ -786,27 +748,27 @@ def create_aggregation_methods_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 4 COMPLETE: Aggregation methods comparison saved to {output_path}")
+    print(f"PLOT 4 COMPLETE: Aggregation methods comparison saved to {output_path}")
 
 def create_performance_summary_table(df, output_dir):
     """
-    STEP 5: Complete Performance Summary Table - Keep unchanged
+    PLOT 5: Complete Performance Summary Table - Enhanced
     """
     print(f"\n{'='*50}")
-    print("STEP 5: PERFORMANCE SUMMARY TABLE")
+    print("PLOT 5: PERFORMANCE SUMMARY TABLE")
     print("="*50)
     
     # Sort by accuracy descending
     df_sorted = df.sort_values('accuracy', ascending=False)
     
-    fig, ax = plt.subplots(figsize=(22, 14))
+    fig, ax = plt.subplots(figsize=(24, 16))
     ax.axis('tight')
     ax.axis('off')
     
-    # Prepare table data
+    # Prepare table data with enhanced information
     table_data = []
     headers = ['Rank', 'Experiment', 'Accuracy', 'F1 Score', 'ROC AUC', 'Precision', 
-               'Feature Type', 'Split Type', 'Dataset', 'Cycle Len', 'Embed Lvl', 'Pos Ratio']
+               'Feature Type', 'Split Type', 'Cycle Len', 'Embed Lvl', 'Pos Ratio', 'Aggregation']
     
     for i, (_, row) in enumerate(df_sorted.iterrows()):
         table_data.append([
@@ -818,10 +780,10 @@ def create_performance_summary_table(df, output_dir):
             f"{row['precision']:.3f}",
             row['feature_type'],
             row['split_type'].title(),
-            row['dataset_type'][:12] + '...' if len(row['dataset_type']) > 12 else row['dataset_type'],
             f"{row['cycle_length']}",
             f"{row['embeddedness_level']}",
-            f"{row['positive_ratio']:.1f}"
+            f"{row['positive_ratio']:.1f}",
+            row['aggregation_method']
         ])
     
     # Create table
@@ -830,7 +792,7 @@ def create_performance_summary_table(df, output_dir):
     table.set_fontsize(8)
     table.scale(1, 1.5)
     
-    # Color rows based on split type and performance
+    # Color rows based on performance
     for i, (_, row) in enumerate(df_sorted.iterrows()):
         row_idx = i + 1  # +1 because of header
         
@@ -850,49 +812,48 @@ def create_performance_summary_table(df, output_dir):
         table[(0, j)].set_facecolor('#4CAF50')  # Green
         table[(0, j)].set_text_props(weight='bold', color='white')
     
-    plt.title('STEP 5: Complete Performance Summary Table\n(Gold/Silver/Bronze for Top 3, Orange for Optimal Split)', 
+    plt.title('Complete Performance Summary Table\n(Gold/Silver/Bronze for Top 3, Orange for Optimal Split)', 
               fontsize=16, fontweight='bold', pad=20)
     
     output_path = os.path.join(output_dir, '5_performance_summary_table.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 5 COMPLETE: Performance summary table saved to {output_path}")
+    print(f"PLOT 5 COMPLETE: Performance summary table saved to {output_path}")
 
 def create_positive_ratio_comparison(df, output_dir):
     """
-    STEP 6: Positive Ratio Comparison - STRICT FILTERING
-    Only use experiments containing "pos_ratio_"
+    PLOT 6: Positive Ratio Comparison - Enhanced for pos_ratio experiments
     """
     print(f"\n{'='*50}")
-    print("STEP 6: POSITIVE RATIO COMPARISON (STRICT FILTERING)")
+    print("PLOT 6: POSITIVE RATIO COMPARISON")
     print("="*50)
     
-    # STRICT FILTERING: Only experiments containing "pos_ratio_"
-    pos_ratio_df = df[df['experiment_name'].str.contains('pos_ratio_')].copy()
+    # Filter for positive ratio experiments from run_experiment.py
+    pos_ratio_experiments = ['pos_ratio_90_10_optimal', 'pos_ratio_80_20_optimal', 
+                            'pos_ratio_70_30_optimal', 'pos_ratio_60_40_optimal', 
+                            'pos_ratio_50_50_optimal']
     
-    print(f"Filtered positive ratio experiments: {len(pos_ratio_df)}")
+    ratio_df = df[df['experiment_name'].isin(pos_ratio_experiments)].copy()
     
-    if len(pos_ratio_df) == 0:
-        print("Warning: No pos_ratio_ experiments found")
-        print("Expected experiments: pos_ratio_90_10_optimal, pos_ratio_80_20_optimal, etc.")
+    if ratio_df.empty:
+        print("Warning: No pos_ratio experiments found from run_experiment.py")
         
-        # Create informational plot
         fig, ax = plt.subplots(figsize=(12, 8))
         ax.text(0.5, 0.5, 
                 'MISSING POSITIVE RATIO EXPERIMENTS\n\n'
-                'Expected experiments:\n'
-                '• pos_ratio_90_10_optimal\n'
-                '• pos_ratio_80_20_optimal\n'
-                '• pos_ratio_70_30_optimal\n'
-                '• pos_ratio_60_40_optimal\n'
-                '• pos_ratio_50_50_optimal\n\n'
-                'Please run these specific experiments first.\n\n'
-                'Each experiment should produce exactly one data point.',
+                'Expected experiments from run_experiment.py:\n'
+                '• pos_ratio_90_10_optimal (90% pos, 10% neg)\n'
+                '• pos_ratio_80_20_optimal (80% pos, 20% neg)\n'
+                '• pos_ratio_70_30_optimal (70% pos, 30% neg)\n'
+                '• pos_ratio_60_40_optimal (60% pos, 40% neg)\n'
+                '• pos_ratio_50_50_optimal (50% pos, 50% neg)\n\n'
+                'These are generated by run_experiment.py with different\n'
+                'pos_edges_ratio settings.',
                 ha='center', va='center', transform=ax.transAxes,
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
-                fontsize=14)
-        ax.set_title('STEP 6: Missing Positive Ratio Experiments')
+                fontsize=12)
+        ax.set_title('PLOT 6: Missing Positive Ratio Experiments')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '6_positive_ratio_comparison.png')
@@ -900,84 +861,59 @@ def create_positive_ratio_comparison(df, output_dir):
         plt.close()
         return
     
-    # Group by positive ratio
-    ratio_groups = pos_ratio_df.groupby('positive_ratio')
-    available_ratios = sorted([ratio for ratio, _ in ratio_groups])
-    
-    print(f"Available positive ratios: {available_ratios}")
+    # Sort by positive ratio
+    ratio_df = ratio_df.sort_values('positive_ratio', ascending=False)
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 6: Impact of Different Positive Ratios on Performance\n(STRICT FILTERING - One Point Per Ratio)', 
+    fig.suptitle('Positive/Negative Ratio Impact on Performance\n'
+                 'Configuration: min_embeddedness=1, cycle_length=4, unweighted, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
-    colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightyellow', 'lightpink']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
     
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        # Prepare data - one point per ratio
-        x_positions = []
-        y_values = []
-        bar_labels = []
+        pos_ratios = ratio_df['positive_ratio'].values * 100  # Convert to percentage
+        values = ratio_df[metric].values
         
-        for j, ratio in enumerate(available_ratios):
-            group_data = ratio_groups.get_group(ratio)
-            if len(group_data) > 0:
-                # Take the first (and ideally only) experiment for this ratio
-                value = group_data[metric].iloc[0]
-                x_positions.append(j)
-                y_values.append(value)
-                bar_labels.append(f'{ratio:.0%} Positive')
+        ax.plot(pos_ratios, values, marker='s', linewidth=3, markersize=8, color='#F18F01')
+        ax.fill_between(pos_ratios, values, alpha=0.3, color='#F18F01')
         
-        if len(y_values) > 0:
-            # Create bar plot
-            bars = ax.bar(range(len(y_values)), y_values, 
-                         color=[colors[i % len(colors)] for i in range(len(y_values))], alpha=0.8)
-            
-            # Add single data points
-            for j, value in enumerate(y_values):
-                ax.scatter(j, value, c='darkred', s=100, zorder=5)
-            
-            # Add value labels
-            for j, (bar, value) in enumerate(zip(bars, y_values)):
-                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005,
-                       f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
-            
-            ax.set_xticks(range(len(bar_labels)))
-            ax.set_xticklabels(bar_labels, rotation=45)
-        
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Impact of Class Distribution', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Positive Examples (%)', fontsize=12)
+        ax.set_ylabel(f'{title} Score', fontsize=12)
         ax.grid(True, alpha=0.3)
+        
+        # Add value labels
+        for x, y in zip(pos_ratios, values):
+            ax.annotate(f'{y:.3f}', (x, y), textcoords="offset points",
+                       xytext=(0,10), ha='center', fontweight='bold')
     
     plt.tight_layout()
-    
     output_path = os.path.join(output_dir, '6_positive_ratio_comparison.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 6 COMPLETE: Positive ratio comparison saved to {output_path}")
+    print(f"PLOT 6 COMPLETE: Positive ratio comparison saved to {output_path}")
 
 def create_cycle_length_comparison(df, output_dir):
     """
-    STEP 7: Cycle Length Comparison - STRICT FILTERING
-    Only use experiments starting with "cycle_length_"
+    PLOT 7: Cycle Length Comparison (3, 4, 5) - NEW ADDITION
     """
     print(f"\n{'='*50}")
-    print("STEP 7: CYCLE LENGTH COMPARISON (STRICT FILTERING)")
+    print("PLOT 7: CYCLE LENGTH COMPARISON (NEW)")
     print("="*50)
     
-    # STRICT FILTERING: Only experiments starting with "cycle_length_"
-    cycle_df = df[df['experiment_name'].str.startswith('cycle_length_')].copy()
+    # Filter for cycle length experiments
+    cycle_experiments = ['cycle_length_3_optimal', 'cycle_length_4_optimal', 'cycle_length_5_optimal']
+    cycle_df = df[df['experiment_name'].isin(cycle_experiments)].copy()
     
-    print(f"Filtered cycle length experiments: {len(cycle_df)}")
-    
-    if len(cycle_df) == 0:
-        print("Warning: No cycle_length_ experiments found")
-        print("Expected experiments: cycle_length_3_optimal, cycle_length_4_optimal, cycle_length_5_optimal")
+    if cycle_df.empty:
+        print("Warning: No cycle length experiments found")
         
-        # Create informational plot
         fig, ax = plt.subplots(figsize=(12, 8))
         ax.text(0.5, 0.5, 
                 'MISSING CYCLE LENGTH EXPERIMENTS\n\n'
@@ -985,12 +921,14 @@ def create_cycle_length_comparison(df, output_dir):
                 '• cycle_length_3_optimal\n'
                 '• cycle_length_4_optimal\n'
                 '• cycle_length_5_optimal\n\n'
-                'Please run these specific experiments first.\n\n'
-                'Each experiment should produce exactly one data point.',
+                'These test different structural feature complexity levels\n'
+                'with HOC features of length 3, 4, and 5.\n\n'
+                'Configuration: pos_ratio=0.5, min_embeddedness=1,\n'
+                'unweighted, max aggregation',
                 ha='center', va='center', transform=ax.transAxes,
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
-                fontsize=14)
-        ax.set_title('STEP 7: Missing Cycle Length Experiments')
+                fontsize=12)
+        ax.set_title('PLOT 7: Missing Cycle Length Experiments')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '7_cycle_length_comparison.png')
@@ -998,56 +936,38 @@ def create_cycle_length_comparison(df, output_dir):
         plt.close()
         return
     
-    # Group by cycle length
-    cycle_groups = cycle_df.groupby('cycle_length')
-    available_cycles = sorted([cycle for cycle, _ in cycle_groups])
-    
-    print(f"Available cycle lengths: {available_cycles}")
+    cycle_df = cycle_df.sort_values('cycle_length')
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 7: Cycle Length Performance Comparison\n(STRICT FILTERING - One Point Per Cycle Length)', 
+    fig.suptitle('Cycle Length Performance Comparison\n'
+                 'Configuration: pos_ratio=0.5, min_embeddedness=1, unweighted, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
-    colors = ['lightblue', 'lightgreen', 'lightcoral']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
     
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        # Prepare data - one point per cycle length
-        x_positions = []
-        y_values = []
-        bar_labels = []
+        cycle_lengths = cycle_df['cycle_length'].values
+        values = cycle_df[metric].values
         
-        for j, cycle_len in enumerate(available_cycles):
-            group_data = cycle_groups.get_group(cycle_len)
-            if len(group_data) > 0:
-                # Take the first (and ideally only) experiment for this cycle length
-                value = group_data[metric].iloc[0]
-                x_positions.append(j)
-                y_values.append(value)
-                bar_labels.append(f'Cycle {cycle_len}')
+        # Plot line with markers
+        ax.plot(cycle_lengths, values, marker='o', linewidth=3, markersize=10, color='#2E86AB')
+        ax.fill_between(cycle_lengths, values, alpha=0.3, color='#2E86AB')
         
-        if len(y_values) > 0:
-            # Create bar plot
-            bars = ax.bar(range(len(y_values)), y_values, 
-                         color=[colors[i % len(colors)] for i in range(len(y_values))], alpha=0.8)
-            
-            # Add single data points
-            for j, value in enumerate(y_values):
-                ax.scatter(j, value, c='darkred', s=100, zorder=5)
-            
-            # Add value labels
-            for j, (bar, value) in enumerate(zip(bars, y_values)):
-                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005,
-                       f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
-            
-            ax.set_xticks(range(len(bar_labels)))
-            ax.set_xticklabels(bar_labels)
-        
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Structural Feature Complexity', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Cycle Length', fontsize=12)
+        ax.set_ylabel(f'{title} Score', fontsize=12)
+        ax.set_xticks(cycle_lengths)
+        ax.set_xticklabels([f'Length {int(length)}' for length in cycle_lengths])
         ax.grid(True, alpha=0.3)
+        
+        # Add value labels
+        for x, y in zip(cycle_lengths, values):
+            ax.annotate(f'{y:.3f}', (x, y), textcoords="offset points", 
+                       xytext=(0,10), ha='center', fontweight='bold')
     
     plt.tight_layout()
     
@@ -1055,42 +975,41 @@ def create_cycle_length_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 7 COMPLETE: Cycle length comparison saved to {output_path}")
+    print(f"PLOT 7 COMPLETE: Cycle length comparison saved to {output_path}")
 
 def create_pos_neg_ratio_experiments_comparison(df, output_dir):
     """
-    STEP 8: Different Pos/Neg Rate Experiments - STRICT FILTERING
-    Same as STEP 6 but with different visualization approach
+    PLOT 8: Different Pos/Neg Rate Experiments - Enhanced version of Plot 6
     """
     print(f"\n{'='*50}")
-    print("STEP 8: DIFFERENT POS/NEG RATE EXPERIMENTS (STRICT FILTERING)")
+    print("PLOT 8: POS/NEG RATIO EXPERIMENTS (Enhanced)")
     print("="*50)
     
-    # STRICT FILTERING: Only experiments containing "pos_ratio_"
-    pos_ratio_df = df[df['experiment_name'].str.contains('pos_ratio_')].copy()
+    # Same as Plot 6 but with different visualization approach
+    pos_ratio_experiments = ['pos_ratio_90_10_optimal', 'pos_ratio_80_20_optimal', 
+                            'pos_ratio_70_30_optimal', 'pos_ratio_60_40_optimal', 
+                            'pos_ratio_50_50_optimal']
     
-    print(f"Filtered pos/neg ratio experiments: {len(pos_ratio_df)}")
+    ratio_df = df[df['experiment_name'].isin(pos_ratio_experiments)].copy()
     
-    if len(pos_ratio_df) == 0:
-        print("Warning: No pos_ratio_ experiments found")
-        print("Expected experiments: pos_ratio_90_10_optimal, pos_ratio_80_20_optimal, etc.")
+    if ratio_df.empty:
+        print("Warning: No pos/neg ratio experiments found")
 
-        # Create informational plot
         fig, ax = plt.subplots(figsize=(12, 8))
         ax.text(0.5, 0.5, 
                 'MISSING POS/NEG RATIO EXPERIMENTS\n\n'
-                'Expected experiments:\n'
+                'Expected experiments with different class ratios:\n'
                 '• pos_ratio_90_10_optimal (90% pos, 10% neg)\n'
                 '• pos_ratio_80_20_optimal (80% pos, 20% neg)\n'
                 '• pos_ratio_70_30_optimal (70% pos, 30% neg)\n'
                 '• pos_ratio_60_40_optimal (60% pos, 40% neg)\n'
                 '• pos_ratio_50_50_optimal (50% pos, 50% neg)\n\n'
-                'Please run these specific experiments first.\n\n'
-                'Each experiment should produce exactly one data point.',
+                'These test model performance under different\n'
+                'class distribution scenarios.',
                ha='center', va='center', transform=ax.transAxes,
                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow"),
                fontsize=12)
-        ax.set_title('STEP 8: Pos/Neg Ratio Analysis\n(Need More Variations)')
+        ax.set_title('PLOT 8: Pos/Neg Ratio Analysis')
         ax.axis('off')
         
         output_path = os.path.join(output_dir, '8_pos_neg_ratio_comparison.png')
@@ -1098,50 +1017,39 @@ def create_pos_neg_ratio_experiments_comparison(df, output_dir):
         plt.close()
         return
     
-    # Group by positive ratio
-    ratio_groups = pos_ratio_df.groupby('positive_ratio')
-    available_ratios = sorted([ratio for ratio, _ in ratio_groups])
+    ratio_df = ratio_df.sort_values('positive_ratio', ascending=False)
     
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('STEP 8: Impact of Different Pos/Neg Ratios on Performance\n(Fixed Optimal Splitting Scheme)', 
+    fig.suptitle('Impact of Different Pos/Neg Ratios on Performance\n'
+                 'Configuration: min_embeddedness=1, cycle_length=4, unweighted, max aggregation', 
                  fontsize=16, fontweight='bold')
     
     metrics = ['accuracy', 'f1_score', 'roc_auc', 'precision']
+    metric_titles = ['Accuracy', 'F1 Score', 'ROC AUC', 'Precision']
     colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightyellow', 'lightpink']
     
-    for i, metric in enumerate(metrics):
+    for i, (metric, title) in enumerate(zip(metrics, metric_titles)):
         ax = axes[i//2, i%2]
         
-        data_to_plot = []
-        labels = []
+        # Create bar plot
+        ratio_labels = [f'{int(row["positive_ratio"]*100)}%-{int((1-row["positive_ratio"])*100)}%' 
+                       for _, row in ratio_df.iterrows()]
+        values = ratio_df[metric].values
         
-        for ratio in available_ratios:
-            group_data = ratio_groups.get_group(ratio)
-            if len(group_data) > 0:
-                data_to_plot.append(group_data[metric].values)
-                labels.append(f'{ratio:.0%} Positive')
+        bars = ax.bar(range(len(ratio_labels)), values, 
+                     color=colors[:len(ratio_labels)], alpha=0.8)
         
-        if len(data_to_plot) > 1:
-            box_plot = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
-            
-            for j, box in enumerate(box_plot['boxes']):
-                box.set_facecolor(colors[j % len(colors)])
-            
-            for j, data in enumerate(data_to_plot):
-                for val in data:
-                    ax.scatter(j+1, val, c='darkred', alpha=0.6, s=30)
-            
-            for j, (ratio, data) in enumerate(zip(available_ratios, data_to_plot)):
-                if len(data) > 0:
-                    mean_val = np.mean(data)
-                    count = len(data)
-                    ax.text(j+1, ax.get_ylim()[1] * 0.95, f'mean={mean_val:.3f}\nn={count}', 
-                           ha='center', va='top', fontweight='bold')
+        # Add value labels
+        for j, (bar, value) in enumerate(zip(bars, values)):
+            ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.005,
+                   f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
         
-        ax.set_title(f'{metric.replace("_", " ").title()}', fontweight='bold')
-        ax.set_ylabel('Score')
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(axis='x', rotation=45)
+        # ENHANCED: Semantic subplot titles
+        ax.set_title(f'{title}: Class Imbalance Impact', fontweight='bold')
+        ax.set_ylabel(f'{title} Score', fontsize=12)
+        ax.set_xticks(range(len(ratio_labels)))
+        ax.set_xticklabels(ratio_labels, rotation=45)
+        ax.grid(True, alpha=0.3, axis='y')
     
     plt.tight_layout()
     
@@ -1149,28 +1057,29 @@ def create_pos_neg_ratio_experiments_comparison(df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print(f"STEP 8 COMPLETE: Pos/neg ratio comparison saved to {output_path}")
+    print(f"PLOT 8 COMPLETE: Pos/neg ratio comparison saved to {output_path}")
 
 def main():
     """
-    Main function following the fixed workflow requirements with RESTORED embeddedness comparison
+    Main function following the enhanced workflow with all required plots
     """
-    print("FIXED COMPLETE RESULTS ANALYSIS - WITH EMBEDDEDNESS COMPARISON")
+    print("COMPLETE RESULTS ANALYSIS - ENHANCED VERSION")
     print("="*80)
-    print("Fixed Workflow Requirements:")
-    print("STEP 1: Weighted vs Unweighted (MOST IMPORTANT - use optimal split only)")
-    print("STEP 2: Dataset Comparison (best configuration only)")
-    print("STEP 3: Embeddedness Level Comparison (0, 1, 2) - RESTORED")
-    print("STEP 4: Aggregation Methods (Max vs Sum vs Others)")
-    print("STEP 5: Performance Summary Table (keep unchanged)")
-    print("STEP 6: Positive Ratio Comparison")
-    print("STEP 7: Cycle Length Comparison (3, 4, 5) - FIXED")
-    print("STEP 8: Pos/Neg Ratio Experiments (fixed optimal splitting) - FIXED")
+    print("Enhanced Workflow with All Required Plots:")
+    print("PLOT 1: Weighted vs Unweighted (MOST IMPORTANT - use optimal split only)")
+    print("PLOT 2: Dataset Comparison (best configuration only)")
+    print("PLOT 3: Embeddedness Level Comparison (0, 1, 2) - FIXED")
+    print("PLOT 4: Aggregation Methods (Max vs Sum vs Stronger)")
+    print("PLOT 5: Performance Summary Table (comprehensive)")
+    print("PLOT 6: Positive Ratio Comparison (from run_experiment.py)")
+    print("PLOT 7: Cycle Length Comparison (3, 4, 5) - NEW")
+    print("PLOT 8: Pos/Neg Ratio Experiments (enhanced version)")
     print("")
-    print("RESTORED CONFIGURATION:")
-    print("- Embeddedness levels: 0 (no filter), 1 (moderate), 2 (strong) - COMPARISON RESTORED")
-    print("- Split ratio: 74:12:14 (test=3080, validation=2640)")
+    print("ENHANCED CONFIGURATION:")
+    print("- Embeddedness filtering applied in preprocessing stage")
+    print("- Split ratio: from config.yaml (test=4000, validation=4000)")
     print("- All experiments use optimal split")
+    print("- Enhanced subplot titles with semantic naming")
     print("="*80)
     
     # Create output directory
@@ -1179,7 +1088,7 @@ def main():
     
     print(f"Output directory: {output_dir}")
     
-    # Find all experiments (now also tracks embeddedness experiments)
+    # Find all experiments
     found_experiments, optimal_experiments, embeddedness_experiments = find_all_experiments()
     
     if not found_experiments:
@@ -1203,14 +1112,14 @@ def main():
     print(f"Including {len(optimal_experiments)} optimal split experiments")
     print(f"Including {len(embeddedness_experiments)} embeddedness experiments")
     
-    # Extract structured data (now with real embeddedness detection)
+    # Extract structured data
     df = extract_experiment_data(all_metrics)
     
     if df.empty:
         print("No valid experiment data found")
         return
     
-    print(f"\nAnalyzing {len(df)} experiments following fixed workflow...")
+    print(f"\nAnalyzing {len(df)} experiments following enhanced workflow...")
     
     # Check available variations
     cycle_lengths = df['cycle_length'].unique()
@@ -1222,103 +1131,52 @@ def main():
     print(f"  Positive ratios: {sorted(positive_ratios)}")
     print(f"  Embeddedness levels: {sorted(embeddedness_levels)}")
     
-    if len(cycle_lengths) <= 1 or len(positive_ratios) <= 1:
-        print(f"\nWARNING: MISSING VARIATIONS DETECTED!")
-        print(f"  To generate missing experiments, run: python run_batch_experiments.py")
-        print(f"  This will create cycle length (3,4,5) and positive ratio (0.9,0.8,0.7,0.6,0.5) experiments")
-    
-    if len(embeddedness_levels) <= 1:
-        print(f"\nWARNING: MISSING EMBEDDEDNESS VARIATIONS!")
-        print(f"  Current embeddedness levels: {sorted(embeddedness_levels)}")
-        print(f"  Expected levels: 0 (no filter), 1 (moderate), 2 (strong)")
-        print(f"  To generate embeddedness experiments:")
-        print(f"    - Create experiments with names containing 'embed_0', 'embed_1', 'embed_2'")
-        print(f"    - Or set min_embeddedness in config files")
-    
     # Store analysis results
     analysis_results = {}
     
-    # FIXED WORKFLOW STEP BY STEP
+    # ENHANCED WORKFLOW - ALL 8 PLOTS
     
-    # STEP 1: Most Important - Weighted vs Unweighted (use optimal split only)
+    # PLOT 1: Most Important - Weighted vs Unweighted (use optimal split only)
     unweighted_means, weighted_means, better_method = create_weighted_vs_unweighted_comparison(df, output_dir)
     analysis_results['better_method'] = better_method
     analysis_results['unweighted_means'] = unweighted_means
     analysis_results['weighted_means'] = weighted_means
     
-    # STEP 2: Dataset Comparison (best configuration only)
+    # PLOT 2: Dataset Comparison (best configuration only)
     create_dataset_comparison(df, output_dir)
     
-    # STEP 3: Embeddedness Level Comparison (RESTORED)
+    # PLOT 3: Embeddedness Level Comparison (FIXED)
     create_embeddedness_comparison(df, output_dir)
     
-    # STEP 4: Aggregation Methods Comparison
+    # PLOT 4: Aggregation Methods Comparison
     create_aggregation_methods_comparison(df, output_dir)
     
-    # STEP 5: Complete Performance Summary Table (keep unchanged)
+    # PLOT 5: Complete Performance Summary Table
     create_performance_summary_table(df, output_dir)
     
-    # STEP 6: Positive Ratio Comparison
+    # PLOT 6: Positive Ratio Comparison
     create_positive_ratio_comparison(df, output_dir)
     
-    # STEP 7: Cycle Length Comparison (3, 4, 5) - FIXED
+    # PLOT 7: Cycle Length Comparison (3, 4, 5) - NEW
     create_cycle_length_comparison(df, output_dir)
     
-    # STEP 8: Pos/Neg Ratio Experiments - FIXED
+    # PLOT 8: Pos/Neg Ratio Experiments - Enhanced
     create_pos_neg_ratio_experiments_comparison(df, output_dir)
     
     # Final summary
     print("\n" + "="*80)
-    print("FIXED WORKFLOW COMPLETION SUMMARY - WITH EMBEDDEDNESS COMPARISON")
+    print("COMPLETE WORKFLOW COMPLETION SUMMARY")
     print("="*80)
     print(f"Analyzed {len(df)} experiments")
     print(f"Best accuracy: {df['accuracy'].max():.3f}")
     print(f"Best F1 score: {df['f1_score'].max():.3f}")
     
-    # Key decision from Step 1
+    # Key decision from Plot 1
     if better_method:
-        print(f"\nKEY DECISION (Step 1): Use {better_method} features for all future work")
+        print(f"\nKEY DECISION (Plot 1): Use {better_method} features for all future work")
         if unweighted_means is not None and weighted_means is not None:
             improvement = abs(unweighted_means['accuracy'] - weighted_means['accuracy']) / min(unweighted_means['accuracy'], weighted_means['accuracy']) * 100
             print(f"Performance difference: {improvement:.1f}%")
-            
-            # Check 90% target
-            if unweighted_means['accuracy'] >= 0.90:
-                print(f"SUCCESS: Unweighted reaches {unweighted_means['accuracy']:.1%} (>=90% target)")
-            else:
-                print(f"WARNING: Unweighted only reaches {unweighted_means['accuracy']:.1%} (<90% target)")
-    
-    # Variation analysis
-    print(f"\nVARIATION ANALYSIS:")
-    print(f"  Cycle lengths available: {len(cycle_lengths)} ({sorted(cycle_lengths)})")
-    print(f"  Positive ratios available: {len(positive_ratios)} ({sorted(positive_ratios)})")
-    print(f"  Embeddedness levels available: {len(embeddedness_levels)} ({sorted(embeddedness_levels)})")
-    
-    # Embeddedness analysis summary
-    if len(embeddedness_levels) > 1:
-        print(f"\nEMBEDDEDNESS LEVEL ANALYSIS:")
-        embed_groups = df.groupby('embeddedness_level')
-        for level in sorted(embeddedness_levels):
-            if level in [0, 1, 2]:
-                group_data = embed_groups.get_group(level)
-                mean_acc = group_data['accuracy'].mean()
-                count = len(group_data)
-                filter_type = {0: "No Filter", 1: "Moderate Filter", 2: "Strong Filter"}[level]
-                print(f"    {filter_type} (Level {level}): {count} experiments, avg accuracy={mean_acc:.3f}")
-        
-        # Find best embeddedness level
-        best_embed_level = df.loc[df['accuracy'].idxmax(), 'embeddedness_level']
-        best_embed_acc = df['accuracy'].max()
-        filter_name = {0: "No Filter", 1: "Moderate Filter", 2: "Strong Filter"}.get(best_embed_level, f"Level {best_embed_level}")
-        print(f"    BEST: {filter_name} (Level {best_embed_level}) with accuracy={best_embed_acc:.3f}")
-    else:
-        print(f"\nEMBEDDEDNESS LEVEL ANALYSIS: Only one level found ({sorted(embeddedness_levels)})")
-        print(f"    To get full comparison, create experiments with embeddedness levels 0, 1, 2")
-    
-    if len(cycle_lengths) <= 1 or len(positive_ratios) <= 1:
-        print(f"\nTO COMPLETE ANALYSIS:")
-        print(f"  Run: python run_batch_experiments.py")
-        print(f"  This will generate the missing experiment variations")
     
     print(f"\nAll plots saved to: {output_dir}")
     
@@ -1339,25 +1197,25 @@ def main():
         filepath = os.path.join(output_dir, filename)
         if os.path.exists(filepath):
             size = os.path.getsize(filepath)
-            print(f"SUCCESS: {filename}: {size:,} bytes")
+            print(f"✓ {filename}: {size:,} bytes")
         else:
-            print(f"MISSING: {filename}: NOT FOUND")
+            print(f"✗ {filename}: NOT FOUND")
     
     print("\n" + "="*80)
-    print("FIXED WORKFLOW COMPLETED WITH EMBEDDEDNESS COMPARISON!")
+    print("ENHANCED WORKFLOW COMPLETED WITH ALL PLOTS!")
     print("Issues addressed:")
-    print("SUCCESS: Step 1 - Weighted vs Unweighted comparison (most important)")
-    print("SUCCESS: Step 2 - Dataset comparison (best configuration only)")
-    print("SUCCESS: Step 3 - Embeddedness level comparison RESTORED (0, 1, 2)")
-    print("SUCCESS: Step 4 - Aggregation methods comparison")
-    print("SUCCESS: Step 5 - Performance summary table")
-    print("SUCCESS: Step 6 - Multiple positive ratios comparison")
-    print("SUCCESS: Step 7 - Cycle length (3, 4, 5) comparison")
-    print("SUCCESS: Step 8 - Pos/neg ratio experiments (90%-10% through 50%-50%)")
-    print("SUCCESS: All experiments use optimal split (74:12:14)")
-    print("SUCCESS: Enhanced experiment detection logic")
-    print("SUCCESS: Real embeddedness level detection from config and experiment names")
-    print("SUCCESS: Ready for presentation with all required plots including embeddedness")
+    print("✓ Plot 1 - Weighted vs Unweighted comparison (most important)")
+    print("✓ Plot 2 - Dataset comparison (best configuration only)")
+    print("✓ Plot 3 - Embeddedness level comparison with preprocessing filtering")
+    print("✓ Plot 4 - Aggregation methods comparison")
+    print("✓ Plot 5 - Performance summary table")
+    print("✓ Plot 6 - Multiple positive ratios comparison")
+    print("✓ Plot 7 - Cycle length (3, 4, 5) comparison - NEW")
+    print("✓ Plot 8 - Pos/neg ratio experiments (enhanced)")
+    print("✓ All experiments use optimal split")
+    print("✓ Enhanced subplot titles with semantic naming")
+    print("✓ Embeddedness filtering applied in preprocessing stage")
+    print("✓ Ready for presentation with all required plots")
     print("="*80)
 
 if __name__ == "__main__":

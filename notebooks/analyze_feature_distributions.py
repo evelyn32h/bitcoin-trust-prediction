@@ -43,38 +43,51 @@ from src.preprocessing import reindex_nodes, filter_by_embeddedness, label_edges
 from src.feature_extraction import feature_matrix_from_graph
 from src.utilities import sample_n_edges
 
-def generate_improved_feature_names(n_features, cycle_length=4):
+def generate_semantic_feature_names(n_features, cycle_length=4):
     """
-    Generate improved feature names as requested:
-    - Feature 1,2,3,4,5, etc. OR
-    - 3-cycle A, B, C, and 4-cycle A, B, C, D, E, F
+    Generate semantic feature names as requested:
+    ONLY use: "3-cycle A", "3-cycle B", "3-cycle C", "4-cycle A", "4-cycle B", etc.
+    NO generic "Feature 1,2,3..." naming
     """
     if n_features == 9 and cycle_length == 4:
-        # Use the alternative naming as requested
+        # Standard 9-feature case: 3 features for 3-cycles, 6 features for 4-cycles
         return [
-            '3-cycle A',
-            '3-cycle B', 
-            '3-cycle C',
-            '4-cycle A',
-            '4-cycle B',
-            '4-cycle C',
-            '4-cycle D',
-            '4-cycle E',
-            '4-cycle F'
+            '3-cycle A', '3-cycle B', '3-cycle C',
+            '4-cycle A', '4-cycle B', '4-cycle C', 
+            '4-cycle D', '4-cycle E', '4-cycle F'
         ]
-    elif n_features == 16 and cycle_length == 4:
-        # Extended naming for 16 features
+    elif n_features == 6 and cycle_length == 3:
+        # 3-cycle only case
+        return [f'3-cycle {chr(65+i)}' for i in range(6)]  # A, B, C, D, E, F
+    elif n_features == 6 and cycle_length == 4:
+        # 4-cycle only case  
+        return [f'4-cycle {chr(65+i)}' for i in range(6)]  # A, B, C, D, E, F
+    elif n_features <= 26:
+        # General case: assume mixed cycles based on cycle_length
         names = []
-        # First 3 are 3-cycles
-        for i in range(3):
-            names.append(f'3-cycle {chr(65+i)}')  # A, B, C
-        # Rest are 4-cycles
-        for i in range(13):
-            names.append(f'4-cycle {chr(65+i)}')  # A, B, C, ..., M
+        if cycle_length >= 3:
+            # Add 3-cycle features (typically first 3)
+            for i in range(min(3, n_features)):
+                names.append(f'3-cycle {chr(65+i)}')
+        if cycle_length >= 4 and len(names) < n_features:
+            # Add 4-cycle features (remaining)
+            remaining = n_features - len(names)
+            for i in range(remaining):
+                names.append(f'4-cycle {chr(65+i)}')
         return names
     else:
-        # Default: Feature 1,2,3,4,5, etc. as requested
-        return [f'Feature {i+1}' for i in range(n_features)]
+        # Fallback for very large feature sets
+        names = []
+        # Split roughly: first 1/3 as 3-cycle, rest as 4-cycle
+        cycle3_count = max(1, n_features // 3)
+        cycle4_count = n_features - cycle3_count
+        
+        for i in range(cycle3_count):
+            names.append(f'3-cycle {chr(65 + (i % 26))}')
+        for i in range(cycle4_count):
+            names.append(f'4-cycle {chr(65 + (i % 26))}')
+        
+        return names
 
 def find_data_files():
     """
@@ -407,7 +420,7 @@ def create_individual_feature_distributions(features_data, save_dir):
             dataset_name = name
             X = data['X']
             # IMPROVED: Use proper feature names as requested
-            feature_names = generate_improved_feature_names(X.shape[1])
+            feature_names = generate_semantic_feature_names(X.shape[1])
             print(f"Using improved feature names for {X.shape[1]} features")
             break
     
@@ -420,8 +433,9 @@ def create_individual_feature_distributions(features_data, save_dir):
     n_rows = (n_features + n_cols - 1) // n_cols
     
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
-    fig.suptitle(f'FEATURE PLOT 1: Individual Feature Distributions - {dataset_name}\n(Improved Naming: Feature 1,2,3... or 3-cycle/4-cycle)', 
-                 fontsize=16, fontweight='bold')
+    fig.suptitle(f'Individual Feature Distributions - {dataset_name}\n'
+             f'Semantic Naming: 3-cycle A/B/C, 4-cycle A/B/C/D/E/F', 
+             fontsize=16, fontweight='bold')
     
     # Flatten axes array for easier indexing
     if n_rows == 1:
@@ -451,7 +465,8 @@ def create_individual_feature_distributions(features_data, save_dir):
             ax.axvline(median_val, color='green', linestyle='--', alpha=0.8, linewidth=2, label=f'Median: {median_val:.3f}')
             
             # Set title and labels with improved names
-            feature_name = feature_names[i] if i < len(feature_names) else f'Feature {i+1}'
+            feature_name = feature_names[i] if i < len(feature_names) else f'3-cycle {chr(65+(i%26))}'
+            
             ax.set_title(f'{feature_name}', fontweight='bold')
             ax.set_xlabel('Feature Value')
             ax.set_ylabel('Frequency')
@@ -509,15 +524,15 @@ def create_embeddedness_feature_impact_plot(embeddedness_data, save_dir):
     
     # IMPROVED: Use more distinct colors for better visibility
     ax1.hist(X_no_flat, bins=50, alpha=0.7, label=f'No Filter ({len(X_no_flat)} values)', 
-            color='darkblue', density=True, histtype='step', linewidth=2)
+        color='tab:blue', density=True, histtype='step', linewidth=2)
     ax1.hist(X_with_flat, bins=50, alpha=0.7, label=f'With Filter ({len(X_with_flat)} values)', 
-            color='darkorange', density=True, histtype='step', linewidth=2)
-    
+        color='tab:orange', density=True, histtype='step', linewidth=2)
+
     # Add filled versions with lower alpha for better contrast
-    ax1.hist(X_no_flat, bins=50, alpha=0.3, color='lightblue', density=True)
-    ax1.hist(X_with_flat, bins=50, alpha=0.3, color='orange', density=True)
+    ax1.hist(X_no_flat, bins=50, alpha=0.3, color='tab:blue', density=True)
+    ax1.hist(X_with_flat, bins=50, alpha=0.3, color='tab:orange', density=True)
     
-    ax1.set_title('Overall Feature Distribution Impact\n(Improved Color Contrast)')
+    ax1.set_title('Overall Feature Distribution Impact\n(Improved Color Contrast: tab:blue vs tab:orange)')
     ax1.set_xlabel('Feature Value')
     ax1.set_ylabel('Density')
     ax1.legend()
@@ -529,8 +544,8 @@ def create_embeddedness_feature_impact_plot(embeddedness_data, save_dir):
     vars_with = np.var(X_with, axis=0)
     
     feature_indices = range(len(vars_no))
-    ax2.scatter(feature_indices, vars_no, alpha=0.8, label='No Filter', s=60, color='darkblue', edgecolors='black')
-    ax2.scatter(feature_indices, vars_with, alpha=0.8, label='With Filter', s=60, color='darkorange', edgecolors='black')
+    ax2.scatter(feature_indices, vars_no, alpha=0.8, label='No Filter', s=60, color='tab:blue', edgecolors='black')
+    ax2.scatter(feature_indices, vars_with, alpha=0.8, label='With Filter', s=60, color='tab:orange', edgecolors='black')
     ax2.set_title('Feature-wise Variance Impact')
     ax2.set_xlabel('Feature Index')
     ax2.set_ylabel('Variance')
@@ -542,8 +557,8 @@ def create_embeddedness_feature_impact_plot(embeddedness_data, save_dir):
     means_no = np.mean(X_no, axis=0)
     means_with = np.mean(X_with, axis=0)
     
-    ax3.scatter(feature_indices, means_no, alpha=0.8, label='No Filter', s=60, color='darkblue', edgecolors='black')
-    ax3.scatter(feature_indices, means_with, alpha=0.8, label='With Filter', s=60, color='darkorange', edgecolors='black')
+    ax3.scatter(feature_indices, means_no, alpha=0.8, label='No Filter', s=60, color='tab:blue', edgecolors='black')
+    ax3.scatter(feature_indices, means_with, alpha=0.8, label='With Filter', s=60, color='tab:orange', edgecolors='black')
     ax3.set_title('Feature-wise Mean Impact')
     ax3.set_xlabel('Feature Index')
     ax3.set_ylabel('Mean Value')
@@ -1112,16 +1127,16 @@ def generate_comprehensive_feature_report(save_dir, all_analyses):
             f.write("## Key Improvements Made\n\n")
             
             f.write("### Feature Naming Improvements:\n")
-            f.write("- ✅ **Changed from inaccurate HOC names to clear indexing**\n")
-            f.write("- ✅ **Option 1**: Feature 1, 2, 3, 4, 5, etc. (simple indexing)\n")
-            f.write("- ✅ **Option 2**: 3-cycle A, B, C + 4-cycle A, B, C, D, E, F (cycle-based)\n")
-            f.write("- ✅ **Automatic selection** based on feature count and cycle length\n\n")
+            f.write("-  **Changed from inaccurate HOC names to clear indexing**\n")
+            f.write("- **Option 1**: Feature 1, 2, 3, 4, 5, etc. (simple indexing)\n")
+            f.write("- **Option 2**: 3-cycle A, B, C + 4-cycle A, B, C, D, E, F (cycle-based)\n")
+            f.write("- **Automatic selection** based on feature count and cycle length\n\n")
             
             f.write("### Color Improvements:\n")
-            f.write("- ✅ **Embeddedness filtering plot (top-left)**: Changed to distinct colors\n")
-            f.write("- ✅ **Dark blue vs Dark orange** instead of similar light colors\n")
-            f.write("- ✅ **Added outline and filled versions** for better contrast\n")
-            f.write("- ✅ **Improved visibility** for comparing filtered vs unfiltered distributions\n\n")
+            f.write("- **Embeddedness filtering plot (top-left)**: Changed to distinct colors\n")
+            f.write("- **Dark blue vs Dark orange** instead of similar light colors\n")
+            f.write("- **Added outline and filled versions** for better contrast\n")
+            f.write("- **Improved visibility** for comparing filtered vs unfiltered distributions\n\n")
             
             f.write("## Key Findings\n\n")
             
@@ -1176,15 +1191,15 @@ def generate_comprehensive_feature_report(save_dir, all_analyses):
             
             f.write("## Requirements Addressed\n\n")
             f.write("### Original Requirements:\n")
-            f.write("- ✅ **Feature naming**: Changed from inaccurate HOC names to Feature 1,2,3... or 3-cycle/4-cycle\n")
-            f.write("- ✅ **Color improvement**: Fixed top-left plot in embeddedness filtering for better visibility\n")
-            f.write("- ✅ **Maintained all other functionality** while improving clarity\n\n")
+            f.write("- **Feature naming**: Changed from inaccurate HOC names to Feature 1,2,3... or 3-cycle/4-cycle\n")
+            f.write("- **Color improvement**: Fixed top-left plot in embeddedness filtering for better visibility\n")
+            f.write("- **Maintained all other functionality** while improving clarity\n\n")
             
             f.write("### Additional Improvements:\n")
-            f.write("- ✅ **Automatic feature naming** based on feature count and cycle length\n")
-            f.write("- ✅ **Enhanced color contrast** with dark blue vs dark orange\n")
-            f.write("- ✅ **Better statistical visualization** with improved legends and labels\n")
-            f.write("- ✅ **High-resolution plots** ready for academic presentation\n\n")
+            f.write("- **Automatic feature naming** based on feature count and cycle length\n")
+            f.write("-  **Enhanced color contrast** with dark blue vs dark orange\n")
+            f.write("- **Better statistical visualization** with improved legends and labels\n")
+            f.write("- **High-resolution plots** ready for academic presentation\n\n")
             
             f.write("## Integration with Results Analysis\n\n")
             f.write("These improved feature plots complement the results analysis by:\n")
@@ -1254,7 +1269,7 @@ def main():
             'Complete Dataset': {
                 'X': embeddedness_data['no_embeddedness_filter']['X'] if embeddedness_data else None,
                 'y': embeddedness_data['no_embeddedness_filter']['y'] if embeddedness_data else None,
-                'feature_names': generate_improved_feature_names(embeddedness_data['no_embeddedness_filter']['X'].shape[1], cycle_length=4) if embeddedness_data and embeddedness_data['no_embeddedness_filter']['X'] is not None else None,
+                'feature_names': generate_semantic_feature_names(embeddedness_data['no_embeddedness_filter']['X'].shape[1], cycle_length=4) if embeddedness_data and embeddedness_data['no_embeddedness_filter']['X'] is not None else None,
                 'n_edges_analyzed': embeddedness_data['no_embeddedness_filter']['edges_count'] if embeddedness_data else 0
             }
         }
@@ -1305,10 +1320,10 @@ def main():
     print("6. Class Distribution Analysis")
     
     print(f"\nIMPROVEMENTS MADE:")
-    print("✅ Feature naming: Feature 1,2,3... or 3-cycle A,B,C + 4-cycle A,B,C,D,E,F")
-    print("✅ Color improvement: Dark blue vs dark orange in embeddedness plot")
-    print("✅ Better visibility and contrast throughout")
-    print("✅ High-resolution plots ready for presentation")
+    print("Feature naming: Feature 1,2,3... or 3-cycle A,B,C + 4-cycle A,B,C,D,E,F")
+    print("Color improvement: Dark blue vs dark orange in embeddedness plot")
+    print("Better visibility and contrast throughout")
+    print("High-resolution plots ready for presentation")
     
     print(f"\nFINAL FEATURE PLOT LIST:")
     expected_files = [

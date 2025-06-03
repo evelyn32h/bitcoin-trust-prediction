@@ -1,25 +1,25 @@
 {
   "actual": {
     "default_threshold": 0.5,
-    "default_f1": 0.9015367103016504,
-    "default_accuracy": 0.827,
-    "best_f1_threshold": 0.8200000000000001,
-    "best_f1": 0.91527446300716,
-    "best_accuracy_threshold": 0.8200000000000001,
-    "best_accuracy": 0.858,
-    "roc_auc": 0.7912687500000001,
-    "average_precision": 0.9232975457131007
+    "default_f1": 0.9145550972304066,
+    "default_accuracy": 0.855,
+    "best_f1_threshold": 0.67,
+    "best_f1": 0.9176610978520287,
+    "best_accuracy_threshold": 0.67,
+    "best_accuracy": 0.862,
+    "roc_auc": 0.8282750000000001,
+    "average_precision": 0.9401817661189762
   },
   "random_baseline": {
     "default_threshold": 0.5,
-    "default_f1": 0.599845797995374,
-    "default_accuracy": 0.481,
+    "default_f1": 0.6198920585967618,
+    "default_accuracy": 0.507,
     "best_f1_threshold": 0.0,
     "best_f1": 0.888888888888889,
     "best_accuracy_threshold": 0.0,
     "best_accuracy": 0.8,
-    "roc_auc": 0.47050625,
-    "average_precision": 0.7837442767704816
+    "roc_auc": 0.50863125,
+    "average_precision": 0.7965237139761445
   },
   "all_positive_baseline": {
     "default_threshold": 0.5,
@@ -33,11 +33,11 @@
     "average_precision": 0.8
   },
   "comparison": {
-    "actual_vs_random_f1_improvement": 0.026385574118271027,
-    "actual_vs_random_accuracy_improvement": 0.05799999999999994,
-    "actual_vs_random_roc_auc_improvement": 0.32076250000000006,
-    "actual_vs_all_positive_f1_improvement": 0.026385574118271027,
-    "actual_vs_all_positive_accuracy_improvement": 0.05799999999999994,
-    "actual_vs_all_positive_roc_auc_improvement": 0.2912687500000001
+    "actual_vs_random_f1_improvement": 0.0287722089631397,
+    "actual_vs_random_accuracy_improvement": 0.061999999999999944,
+    "actual_vs_random_roc_auc_improvement": 0.3196437500000001,
+    "actual_vs_all_positive_f1_improvement": 0.0287722089631397,
+    "actual_vs_all_positive_accuracy_improvement": 0.061999999999999944,
+    "actual_vs_all_positive_roc_auc_improvement": 0.3282750000000001
   }
 }

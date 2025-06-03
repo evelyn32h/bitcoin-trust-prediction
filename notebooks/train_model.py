@@ -6,7 +6,6 @@ import networkx as nx
 import joblib
 import yaml
 
-
 # Add project root to sys.path for src imports
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
@@ -54,18 +53,20 @@ def load_experiment_config(experiment_name):
 def train_model_on_set(G_train, cycle_length=4, use_weighted_features=False, weight_aggregation='product'):
     """
     Trains a model on the given training graph and returns the trained model and scaler.
-    Now supports weighted features.
+    UPDATED: Embeddedness filtering is now handled in preprocessing stage, not here.
     """
     # Print some info about edge weights before reindexing
     G_train = reindex_nodes(G_train)
     
+    # UPDATED: Simplified sampling - embeddedness filtering already applied in preprocessing
+    # Only handle positive/negative ratio sampling here
     sampled_edges = sample_n_edges(G_train,
         pos_ratio = config.get('pos_train_edges_ratio', None),
-        min_embeddedness = config.get('min_train_embeddedness', None),
+        min_embeddedness = None,  # REMOVED: No longer filter by embeddedness here
         strict=True
     )
     
-    # Extract features with enhanced support
+    # Extract features
     X_train, y_train, _ = feature_matrix_from_graph(
         G_train, 
         edges=sampled_edges,
@@ -133,6 +134,13 @@ def main():
     print(f"Configuration loaded:")
     print(f"  Use weighted features: {use_weighted_features}")
     print(f"  Weight aggregation: {weight_aggregation}")
+    
+    # UPDATED: Note that embeddedness filtering was applied in preprocessing
+    if exp_config.get('embeddedness_filtering_applied') == 'preprocessing_stage':
+        min_embeddedness_used = exp_config.get('min_train_embeddedness', 'unknown')
+        print(f"  Embeddedness filtering: Applied in preprocessing (level={min_embeddedness_used})")
+    else:
+        print(f"  Embeddedness filtering: Not applied or unknown")
 
     print(f"Loading training sets from {training_dir} ...")
     training_sets = load_training_sets(training_dir, args.n_folds)
@@ -151,10 +159,12 @@ def main():
         'cycle_length': args.cycle_length,
         'experiment_name': args.name,
         'use_weighted_features': use_weighted_features,
-        'weight_aggregation': weight_aggregation
+        'weight_aggregation': weight_aggregation,
+        'embeddedness_note': 'Embeddedness filtering applied in preprocessing stage'
     }, out_dir)
     
-    print("\nSUCCESS: All models trained and saved.")
+    print("\nAll models trained and saved.")
+    print("Note: Embeddedness filtering was applied during preprocessing, not training.")
 
 if __name__ == "__main__":
     main()

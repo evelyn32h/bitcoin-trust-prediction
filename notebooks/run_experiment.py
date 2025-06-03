@@ -1,393 +1,405 @@
 #!/usr/bin/env python3
 """
-run_experiment.py - Orchestrates the full machine learning pipeline
+Single Experiment Runner with Parameter Override Support
+======================================================
 
-This script runs the complete experiment pipeline consisting of:
-1. Preprocessing (preprocess.py)
-2. Training (train_model.py) 
-3. Validation (validate_model.py)
-4. Testing (test_model.py)
-5. Analysis (analyze_results.py)
+This script runs individual experiments with specific parameter overrides.
+Designed for pos_ratio experiments and other parameter variations.
 
-You can selectively enable/disable pipeline steps using command line arguments.
-You can also specify a custom config file to override default parameters.
+Key Features:
+- Parameter override via --override "key=value;key2=value2" syntax
+- Embeddedness filtering applied in preprocessing stage
+- Optimal split ratios (74:12:14)
+- Automatic experiment naming based on parameters
+
+Usage Examples:
+python notebooks/run_experiment.py --override "pos_edges_ratio=0.5;min_train_embeddedness=1"
+python notebooks/run_experiment.py --override "pos_edges_ratio=0.6;min_train_embeddedness=1"
+python notebooks/run_experiment.py --override "cycle_length=3;min_train_embeddedness=1"
 """
 
 import os
 import sys
 import argparse
-import subprocess
-import time
 import yaml
+import subprocess
+import json
+import time
+from pathlib import Path
 from datetime import datetime
 
-# Set project root as working directory
+# Set project root
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-os.chdir(PROJECT_ROOT)
-
-# Add project root to sys.path for src imports
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-def load_config(config_path=None):
+def parse_override_string(override_str):
     """
-    Load configuration from YAML file
-    
-    Args:
-        config_path: Path to config file. If None, uses default config.yaml
-    
-    Returns:
-        dict: Configuration dictionary
+    Parse override string like "pos_edges_ratio=0.5;min_train_embeddedness=1"
+    Returns dictionary of parameter overrides
     """
-    if config_path is None:
-        config_path = os.path.join(PROJECT_ROOT, 'config.yaml')
+    if not override_str:
+        return {}
     
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Config file not found: {config_path}")
+    overrides = {}
+    parts = override_str.split(';')
     
-    print(f"Loading configuration from: {config_path}")
+    for part in parts:
+        part = part.strip()
+        if '=' in part:
+            key, value = part.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+            
+            # Convert values to appropriate types
+            if value.lower() in ['true', 'false']:
+                overrides[key] = value.lower() == 'true'
+            elif value.replace('.', '').replace('-', '').isdigit():
+                if '.' in value:
+                    overrides[key] = float(value)
+                else:
+                    overrides[key] = int(value)
+            else:
+                overrides[key] = value
+                
+            print(f"Parsed override: {key} = {overrides[key]} (type: {type(overrides[key]).__name__})")
     
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
+    return overrides
+
+def load_and_modify_config(config_path, overrides, experiment_name):
+    """
+    Load base config and apply overrides for this specific experiment
+    """
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config from {config_path}: {e}")
+        return None
+    
+    print(f"Base config loaded successfully")
+    
+    # Apply overrides
+    for key, value in overrides.items():
+        original_value = config.get(key, "not set")
+        config[key] = value
+        print(f"Override applied: {key} = {value} (was: {original_value})")
+    
+    # Set experiment-specific parameters
+    config['default_experiment_name'] = experiment_name
+    
+    # Ensure optimal split configuration
+    config['num_test_edges'] = 3080
+    config['num_validation_edges'] = 2640
+    config['optimal_split'] = True
+    
+    # Default values for consistency
+    if 'min_train_embeddedness' not in config:
+        config['min_train_embeddedness'] = 1
+    if 'min_val_embeddedness' not in config:
+        config['min_val_embeddedness'] = 1
+    if 'min_test_embeddedness' not in config:
+        config['min_test_embeddedness'] = 1
+    if 'cycle_length' not in config:
+        config['cycle_length'] = 4
+    if 'bidirectional_method' not in config:
+        config['bidirectional_method'] = 'max'
+    if 'use_weighted_features' not in config:
+        config['use_weighted_features'] = False
     
     return config
 
-def run_command(cmd, description, cwd=None):
+def generate_experiment_name(overrides):
     """
-    Run a shell command and handle errors gracefully.
-    
-    Args:
-        cmd: List of command arguments
-        description: Human-readable description of the command
-        cwd: Working directory (defaults to PROJECT_ROOT)
-    
-    Returns:
-        bool: True if command succeeded, False otherwise
+    Generate experiment name based on key parameters
+    Priority: pos_edges_ratio > min_train_embeddedness > cycle_length > use_weighted_features
     """
-    if cwd is None:
-        cwd = PROJECT_ROOT
+    print(f"Generating experiment name from overrides: {overrides}")
     
+    # Extract key parameters
+    pos_ratio = overrides.get('pos_edges_ratio')
+    min_embeddedness = overrides.get('min_train_embeddedness')
+    cycle_length = overrides.get('cycle_length')
+    weighted = overrides.get('use_weighted_features')
+    bidirectional_method = overrides.get('bidirectional_method')
+    
+    # Generate name based on most significant parameter
+    if pos_ratio is not None:
+        pos_pct = int(pos_ratio * 100)
+        neg_pct = 100 - pos_pct
+        name = f"pos_ratio_{pos_pct}_{neg_pct}_optimal"
+        print(f"Generated name based on pos_ratio: {name}")
+        return name
+        
+    elif min_embeddedness is not None and min_embeddedness != 1:  # Only if different from default
+        name = f"embed_{min_embeddedness}_optimal"
+        print(f"Generated name based on embeddedness: {name}")
+        return name
+        
+    elif cycle_length is not None and cycle_length != 4:  # Only if different from default
+        name = f"cycle_length_{cycle_length}_optimal"
+        print(f"Generated name based on cycle_length: {name}")
+        return name
+        
+    elif weighted is not None:
+        feature_type = "weighted" if weighted else "unweighted"
+        name = f"{feature_type}_optimal"
+        print(f"Generated name based on feature type: {name}")
+        return name
+        
+    elif bidirectional_method is not None and bidirectional_method != 'max':  # Only if different from default
+        name = f"aggregation_{bidirectional_method}_optimal"
+        print(f"Generated name based on aggregation method: {name}")
+        return name
+        
+    else:
+        name = "single_experiment_optimal"
+        print(f"Generated default name: {name}")
+        return name
+
+def run_experiment_pipeline(config, experiment_name):
+    """
+    Run the complete experiment pipeline: preprocess -> train -> validate -> test
+    """
     print(f"\n{'='*60}")
-    print(f"Running: {description}")
-    print(f"Command: {' '.join(cmd)}")
+    print(f"RUNNING EXPERIMENT PIPELINE: {experiment_name}")
     print(f"{'='*60}")
     
-    start_time = time.time()
+    # Extract key parameters for command line
+    min_embeddedness = config.get('min_train_embeddedness', 1)
+    use_weighted = config.get('use_weighted_features', False)
+    bidirectional_method = config.get('bidirectional_method', 'max')
+    cycle_length = config.get('cycle_length', 4)
+    
+    print(f"Key experiment parameters:")
+    print(f"  Experiment name: {experiment_name}")
+    print(f"  min_train_embeddedness: {min_embeddedness}")
+    print(f"  use_weighted_features: {use_weighted}")
+    print(f"  bidirectional_method: {bidirectional_method}")
+    print(f"  cycle_length: {cycle_length}")
     
     try:
-        result = subprocess.run(cmd, cwd=cwd, check=True, capture_output=False)
-        elapsed = time.time() - start_time
-        print(f"\nSUCCESS: {description} completed successfully in {elapsed:.1f} seconds")
-        return True
-    except subprocess.CalledProcessError as e:
-        elapsed = time.time() - start_time
-        print(f"\nFAILED: {description} failed after {elapsed:.1f} seconds with exit code {e.returncode}")
-        return False
-    except FileNotFoundError:
-        print(f"\nFAILED: {description} failed: Command not found")
-        return False
-
-def run_preprocess(args, config):
-    """Run the preprocessing step."""
-    cmd = ['python', 'notebooks/preprocess.py', '--name', args.name]
-    
-    # Add optional arguments
-    if args.bidirectional_method:
-        cmd.extend(['--bidirectional_method', args.bidirectional_method])
-    if args.use_weighted_features:
-        cmd.append('--use_weighted_features')
-    if args.weight_method:
-        cmd.extend(['--weight_method', args.weight_method])
-    
-    return run_command(cmd, "Data Preprocessing")
-
-def run_training(args, config):
-    """Run the training step."""
-    cmd = ['python', 'notebooks/train_model.py', 
-           '--name', args.name,
-           '--n_folds', str(args.n_folds),
-           '--cycle_length', str(args.cycle_length)]
-    
-    return run_command(cmd, "Model Training")
-
-def run_validation(args, config):
-    """Run the validation step."""
-    cmd = ['python', 'notebooks/validate_model.py',
-           '--name', args.name,
-           '--n_folds', str(args.n_folds),
-           '--cycle_length', str(args.cycle_length)]
-    
-    # Add optional validation-specific arguments
-    if args.predictions_per_fold:
-        cmd.extend(['--predictions_per_fold', str(args.predictions_per_fold)])
-    if args.pos_edges_ratio:
-        cmd.extend(['--pos_edges_ratio', str(args.pos_edges_ratio)])
-    
-    return run_command(cmd, "Model Validation")
-
-def run_testing(args, config):
-    """Run the testing step."""
-    cmd = ['python', 'notebooks/test_model.py',
-           '--name', args.name,
-           '--n_folds', str(args.n_folds),
-           '--cycle_length', str(args.cycle_length)]
-    
-    # Add optional testing-specific arguments
-    if args.threshold_type:
-        cmd.extend(['--threshold_type', args.threshold_type])
-    
-    return run_command(cmd, "Model Testing")
-
-def run_analysis(args, config):
-    """Run the results analysis step."""
-    cmd = ['python', 'notebooks/analyze_results.py', '--name', args.name]
-    
-    return run_command(cmd, "Results Analysis")
-
-def print_experiment_summary(args, config, results, total_time):
-    """Print a summary of the experiment run."""
-    print(f"\n{'='*80}")
-    print(f"EXPERIMENT SUMMARY")
-    print(f"{'='*80}")
-    print(f"Experiment Name: {args.name}")
-    print(f"Config File: {args.config or 'config.yaml (default)'}")
-    print(f"Start Time: {args._start_time}")
-    print(f"Total Runtime: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
-    print(f"Configuration:")
-    print(f"  - N Folds: {args.n_folds}")
-    print(f"  - Cycle Length: {args.cycle_length}")
-    print(f"  - Weighted Features: {args.use_weighted_features}")
-    if args.use_weighted_features:
-        print(f"  - Weight Method: {args.weight_method}")
-        print(f"  - Bidirectional Method: {args.bidirectional_method}")
-    
-    # Print key config parameters if available
-    if config:
-        if 'min_train_embeddedness' in config:
-            print(f"  - Min Train Embeddedness: {config['min_train_embeddedness']}")
-        if 'min_test_embeddedness' in config:
-            print(f"  - Min Test Embeddedness: {config['min_test_embeddedness']}")
-        if 'use_weighted_features' in config:
-            print(f"  - Config Weighted Features: {config['use_weighted_features']}")
-    
-    print(f"\nPipeline Steps:")
-    step_names = ['Preprocessing', 'Training', 'Validation', 'Testing', 'Analysis']
-    step_flags = [args.preprocess, args.train, args.validate, args.test, args.analyze]
-    
-    for name, enabled, result in zip(step_names, step_flags, results):
-        if enabled:
-            status = "SUCCESS" if result else "FAILED"
-            print(f"  - {name}: {status}")
+        # Step 1: Preprocessing with embeddedness filtering
+        print(f"\nStep 1: Running preprocessing...")
+        preprocess_cmd = [
+            sys.executable, 'notebooks/preprocess.py',
+            '--name', experiment_name,
+            '--min_embeddedness', str(min_embeddedness),
+            '--bidirectional_method', bidirectional_method
+        ]
+        
+        if use_weighted:
+            preprocess_cmd.append('--use_weighted_features')
+        
+        print(f"  Command: {' '.join(preprocess_cmd)}")
+        result = subprocess.run(preprocess_cmd, cwd=PROJECT_ROOT, 
+                               capture_output=True, text=True, timeout=1800)
+        
+        if result.returncode != 0:
+            print(f"  ✗ Preprocessing failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        print(f"  ✓ Preprocessing completed successfully")
+        
+        # Step 2: Training
+        print(f"\nStep 2: Running training...")
+        train_cmd = [
+            sys.executable, 'notebooks/train_model.py',
+            '--name', experiment_name,
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        print(f"  Command: {' '.join(train_cmd)}")
+        result = subprocess.run(train_cmd, cwd=PROJECT_ROOT,
+                               capture_output=True, text=True, timeout=1800)
+        
+        if result.returncode != 0:
+            print(f"  ✗ Training failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        print(f"  ✓ Training completed successfully")
+        
+        # Step 3: Validation
+        print(f"\nStep 3: Running validation...")
+        validate_cmd = [
+            sys.executable, 'notebooks/validate_model.py',
+            '--name', experiment_name,
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        result = subprocess.run(validate_cmd, cwd=PROJECT_ROOT,
+                               capture_output=True, text=True, timeout=1800)
+        
+        if result.returncode != 0:
+            print(f"  ✗ Validation failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        print(f"  ✓ Validation completed successfully")
+        
+        # Step 4: Testing
+        print(f"\nStep 4: Running testing...")
+        test_cmd = [
+            sys.executable, 'notebooks/test_model.py',
+            '--name', experiment_name,
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        result = subprocess.run(test_cmd, cwd=PROJECT_ROOT,
+                               capture_output=True, text=True, timeout=1800)
+        
+        if result.returncode != 0:
+            print(f"  ✗ Testing failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        print(f"  ✓ Testing completed successfully")
+        
+        # Verify results
+        metrics_path = os.path.join(PROJECT_ROOT, 'results', experiment_name, 'testing', 'metrics.json')
+        if os.path.exists(metrics_path):
+            print(f"  ✓ Results verified: {metrics_path}")
+            
+            # Load and display key metrics
+            try:
+                with open(metrics_path, 'r') as f:
+                    metrics = json.load(f)
+                
+                if 'actual' in metrics:
+                    actual = metrics['actual']
+                    print(f"  Key Results:")
+                    print(f"    Accuracy: {actual.get('accuracy', 0):.4f}")
+                    print(f"    F1 Score: {actual.get('f1_score', 0):.4f}")
+                    print(f"    ROC AUC: {actual.get('roc_auc', 0):.4f}")
+                
+            except Exception as e:
+                print(f"  Warning: Could not load metrics: {e}")
+            
+            # Save config to results directory
+            config_save_path = os.path.join(PROJECT_ROOT, 'results', experiment_name, 'config_used.yaml')
+            os.makedirs(os.path.dirname(config_save_path), exist_ok=True)
+            with open(config_save_path, 'w', encoding='utf-8') as f:
+                yaml.dump(config, f, default_flow_style=False)
+            print(f"  ✓ Configuration saved for future reference")
+            
+            return True
         else:
-            print(f"  - {name}: SKIPPED")
-    
-    # Overall status
-    if all(result for result, enabled in zip(results, step_flags) if enabled):
-        print(f"\nSUCCESS: Experiment completed successfully!")
-    else:
-        print(f"\nWARNING: Experiment completed with some failures.")
-    
-    print(f"{'='*80}")
+            print(f"  ✗ Results not found: {metrics_path}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print(f"  ✗ Pipeline step timed out")
+        return False
+    except Exception as e:
+        print(f"  ✗ Pipeline failed with exception: {e}")
+        return False
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run the complete machine learning experiment pipeline",
+        description="Run single experiment with parameter overrides",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run full pipeline with default config
-  python run_experiment.py --name my_experiment
+  # Run pos_ratio experiments
+  python notebooks/run_experiment.py --override "pos_edges_ratio=0.5;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "pos_edges_ratio=0.6;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "pos_edges_ratio=0.7;min_train_embeddedness=1"
 
-  # Run with custom config file
-  python run_experiment.py --name my_experiment --config config_custom.yaml
+  # Run embeddedness experiments  
+  python notebooks/run_experiment.py --override "min_train_embeddedness=0;pos_edges_ratio=0.5"
+  python notebooks/run_experiment.py --override "min_train_embeddedness=1;pos_edges_ratio=0.5"
+  python notebooks/run_experiment.py --override "min_train_embeddedness=2;pos_edges_ratio=0.5"
 
-  # Run only preprocessing and training (using short flags)
-  python run_experiment.py --name my_experiment -p -tr
+  # Run cycle length experiments
+  python notebooks/run_experiment.py --override "cycle_length=3;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "cycle_length=4;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "cycle_length=5;min_train_embeddedness=1"
 
-  # Run only preprocessing, training and validation (using short flags)
-  python run_experiment.py --name my_experiment -p -tr -v
+  # Run weighted vs unweighted experiments
+  python notebooks/run_experiment.py --override "use_weighted_features=true;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "use_weighted_features=false;min_train_embeddedness=1"
 
-  # Run only testing and analysis (using short flags)
-  python run_experiment.py --name my_experiment -te -a
-
-  # Run all except validation and testing (using --no-* flags)
-  python run_experiment.py --name my_experiment --no-validate --no-test
-
-  # Run with weighted features
-  python run_experiment.py --name weighted_exp --use_weighted_features --weight_method raw
-
-  # Run only analysis on existing results
-  python run_experiment.py --name existing_exp -a
+  # Run aggregation method experiments
+  python notebooks/run_experiment.py --override "bidirectional_method=max;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "bidirectional_method=sum;min_train_embeddedness=1"
+  python notebooks/run_experiment.py --override "bidirectional_method=stronger;min_train_embeddedness=1"
         """
     )
     
-    # Configuration file argument - ADD THIS FIRST
-    parser.add_argument('--config', type=str, 
-                       help="Path to YAML config file (overrides default config.yaml)")
+    parser.add_argument('--config', type=str, default='config.yaml',
+                       help="Base config file to use")
+    parser.add_argument('--override', type=str, required=True,
+                       help="Parameter overrides in format 'key=value;key2=value2'")
+    parser.add_argument('--name', type=str, default=None,
+                       help="Experiment name (auto-generated if not provided)")
     
-    # Load config early to get defaults
-    # We need to parse known args first to get the config path
-    known_args, remaining_args = parser.parse_known_args()
-    config = load_config(known_args.config)
-    
-    # Extract defaults from config
-    DEFAULT_EXPERIMENT_NAME = config.get('default_experiment_name', 'default_experiment')
-    N_FOLDS = config.get('default_n_folds', 5)
-    CYCLE_LENGTH = config.get('cycle_length', 4)
-    
-    # Experiment configuration
-    parser.add_argument('--name', type=str, default=DEFAULT_EXPERIMENT_NAME,
-                       help=f"Experiment name (default: {DEFAULT_EXPERIMENT_NAME})")
-    parser.add_argument('--n_folds', type=int, default=N_FOLDS,
-                       help=f"Number of folds for cross-validation (default: {N_FOLDS})")
-    parser.add_argument('--cycle_length', type=int, default=CYCLE_LENGTH,
-                       help=f"Cycle length for feature extraction (default: {CYCLE_LENGTH})")
-    
-    # Pipeline step control - two modes:
-    # Mode 1: Disable specific steps (--no-* flags) - all enabled by default
-    parser.add_argument('--no-preprocess', dest='preprocess', action='store_false',
-                       help="Skip preprocessing step")
-    parser.add_argument('--no-train', dest='train', action='store_false',
-                       help="Skip training step")
-    parser.add_argument('--no-validate', dest='validate', action='store_false',
-                       help="Skip validation step")
-    parser.add_argument('--no-test', dest='test', action='store_false',
-                       help="Skip testing step")
-    parser.add_argument('--no-analyze', dest='analyze', action='store_false',
-                       help="Skip analysis step")
-    
-    # Mode 2: Enable only specific steps (short flags) - all disabled by default when any short flag is used
-    parser.add_argument('-p', '--only-preprocess', dest='only_preprocess', action='store_true',
-                       help="Run only preprocessing step")
-    parser.add_argument('-tr', '--only-train', dest='only_train', action='store_true',
-                       help="Run only training step")
-    parser.add_argument('-v', '--only-validate', dest='only_validate', action='store_true',
-                       help="Run only validation step")
-    parser.add_argument('-te', '--only-test', dest='only_test', action='store_true',
-                       help="Run only testing step")
-    parser.add_argument('-a', '--only-analyze', dest='only_analyze', action='store_true',
-                       help="Run only analysis step")
-    
-    # Set defaults for pipeline steps (all enabled by default unless "only" flags are used)
-    parser.set_defaults(preprocess=True, train=True, validate=True, test=True, analyze=True)
-    
-    # Preprocessing arguments
-    parser.add_argument('--bidirectional_method', type=str,
-                       help="Method for handling bidirectional edges")
-    parser.add_argument('--use_weighted_features', action='store_true',
-                       help="Enable weighted features")
-    parser.add_argument('--weight_method', type=str,
-                       help="Weight processing method: sign, raw, binned")
-    
-    # Validation arguments
-    parser.add_argument('--predictions_per_fold', type=int,
-                       help="Number of validation predictions per fold")
-    parser.add_argument('--pos_edges_ratio', type=float,
-                       help="Positive edge ratio for validation sampling")
-    
-    # Testing arguments
-    parser.add_argument('--threshold_type', type=str,
-                       help="Threshold type for testing (e.g., default_threshold, best_f1_threshold)")
-    
-    # Parse all arguments now
     args = parser.parse_args()
     
-    # Reload config in case it changed
-    config = load_config(args.config)
+    # Find config file
+    config_paths = [
+        os.path.join(PROJECT_ROOT, args.config),
+        os.path.join(PROJECT_ROOT, 'config.yaml'),
+        os.path.join(PROJECT_ROOT, 'configs', args.config)
+    ]
     
-    # Handle "only" mode: if any -p, -tr, -v, -te, -a flags are used,
-    # disable all steps first, then enable only the specified ones
-    only_flags_used = any([args.only_preprocess, args.only_train, args.only_validate, 
-                          args.only_test, args.only_analyze])
+    config_path = None
+    for path in config_paths:
+        if os.path.exists(path):
+            config_path = path
+            break
     
-    if only_flags_used:
-        # Disable all steps first
-        args.preprocess = False
-        args.train = False
-        args.validate = False
-        args.test = False
-        args.analyze = False
-        
-        # Enable only the specified steps
-        if args.only_preprocess:
-            args.preprocess = True
-        if args.only_train:
-            args.train = True
-        if args.only_validate:
-            args.validate = True
-        if args.only_test:
-            args.test = True
-        if args.only_analyze:
-            args.analyze = True
+    if not config_path:
+        print(f"Error: Config file not found. Tried:")
+        for path in config_paths:
+            print(f"  - {path}")
+        return False
     
-    # Record start time for summary
-    args._start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    experiment_start = time.time()
+    print(f"Using config file: {config_path}")
     
-    # Print experiment configuration
-    print(f"Starting experiment: {args.name}")
-    print(f"Using config: {args.config or 'config.yaml (default)'}")
-    print(f"Pipeline steps to run: ", end="")
-    steps = []
-    if args.preprocess: steps.append("preprocess")
-    if args.train: steps.append("train")  
-    if args.validate: steps.append("validate")
-    if args.test: steps.append("test")
-    if args.analyze: steps.append("analyze")
-    print(" → ".join(steps))
+    # Parse overrides
+    overrides = parse_override_string(args.override)
+    if not overrides:
+        print("Error: No valid overrides found")
+        return False
     
-    # Print key configuration parameters
-    print(f"\nKey Configuration Parameters:")
-    if 'min_train_embeddedness' in config:
-        print(f"  - Min Train Embeddedness: {config['min_train_embeddedness']}")
-    if 'min_test_embeddedness' in config:
-        print(f"  - Min Test Embeddedness: {config['min_test_embeddedness']}")
-    if 'use_weighted_features' in config:
-        print(f"  - Use Weighted Features: {config['use_weighted_features']}")
-    if 'cycle_length' in config:
-        print(f"  - Cycle Length: {config['cycle_length']}")
+    print(f"Parsed overrides: {overrides}")
     
-    # Run pipeline steps
-    results = []
+    # Generate experiment name
+    experiment_name = args.name or generate_experiment_name(overrides)
+    print(f"Experiment name: {experiment_name}")
     
-    if args.preprocess:
-        results.append(run_preprocess(args, config))
+    # Load and modify config
+    config = load_and_modify_config(config_path, overrides, experiment_name)
+    if not config:
+        return False
+    
+    # Print final configuration summary
+    print(f"\nFinal Configuration Summary:")
+    key_params = ['pos_edges_ratio', 'min_train_embeddedness', 'cycle_length', 
+                  'use_weighted_features', 'bidirectional_method']
+    for param in key_params:
+        if param in config:
+            print(f"  {param}: {config[param]}")
+    
+    # Run experiment
+    start_time = time.time()
+    success = run_experiment_pipeline(config, experiment_name)
+    elapsed_time = time.time() - start_time
+    
+    print(f"\n{'='*60}")
+    if success:
+        print(f"✓ EXPERIMENT {experiment_name} COMPLETED SUCCESSFULLY!")
+        print(f"  Execution time: {elapsed_time/60:.1f} minutes")
+        print(f"  Results saved to: results/{experiment_name}/")
+        print(f"  Key files generated:")
+        print(f"    - results/{experiment_name}/testing/metrics.json")
+        print(f"    - results/{experiment_name}/config_used.yaml")
     else:
-        results.append(True)  # Skipped steps count as successful
-        
-    if args.train:
-        if not args.preprocess:
-            print("\nNote: Training without preprocessing - ensure preprocess data exists")
-        results.append(run_training(args, config))
-    else:
-        results.append(True)
-        
-    if args.validate:
-        if not args.train and not args.preprocess:
-            print("\nNote: Validation without training/preprocessing - ensure trained models exist")
-        results.append(run_validation(args, config))
-    else:
-        results.append(True)
-        
-    if args.test:
-        if not args.validate and not args.train and not args.preprocess:
-            print("\nNote: Testing without previous steps - ensure all prerequisites exist")
-        results.append(run_testing(args, config))
-    else:
-        results.append(True)
-        
-    if args.analyze:
-        results.append(run_analysis(args, config))
-    else:
-        results.append(True)
+        print(f"✗ EXPERIMENT {experiment_name} FAILED!")
+        print(f"  Execution time: {elapsed_time/60:.1f} minutes")
+        print(f"  Check error messages above for details")
+    print(f"{'='*60}")
     
-    # Print summary
-    total_time = time.time() - experiment_start
-    print_experiment_summary(args, config, results, total_time)
-    
-    # Exit with error code if any step failed
-    if not all(result for result, enabled in zip(results, [args.preprocess, args.train, args.validate, args.test, args.analyze]) if enabled):
-        sys.exit(1)
+    return success
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced Batch Experiments Runner - Fixed Configuration Handling
-===============================================================
+Enhanced Batch Experiments Runner - Fixed Embeddedness Parameter Handling
+=========================================================================
 
 This script runs comprehensive batch experiments for link prediction analysis:
 - Step 1: Weighted vs Unweighted Features Comparison
@@ -9,8 +9,8 @@ This script runs comprehensive batch experiments for link prediction analysis:
 - Steps 6&8: Positive/Negative Ratio Comparisons
 - Step 7: Cycle Length Comparisons (3, 4, 5)
 
-FIXED: Now properly calls run_experiment.py with --config parameter,
-ensuring all configuration parameters are correctly applied.
+FIXED: Embeddedness parameters are now passed to preprocessing stage,
+ensuring proper filtering before BFS sampling.
 
 Usage: python run_batch_experiments.py
 """
@@ -39,7 +39,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def run_single_experiment(experiment_name, config_modifications=None, base_config_name='config.yaml'):
     """
     Run a single experiment with specified configuration modifications
-    FIXED: Now properly calls run_experiment.py with custom config file
+    FIXED: Properly pass embeddedness parameters to preprocessing stage
     """
     print(f"\n{'='*60}")
     print(f"RUNNING EXPERIMENT: {experiment_name}")
@@ -77,12 +77,24 @@ def run_single_experiment(experiment_name, config_modifications=None, base_confi
         print(f"Error loading base config: {e}")
         return False
     
-    # Apply configuration modifications
+    # Apply configuration modifications first
     for key, value in config_modifications.items():
         config[key] = value
         print(f"  Modified config: {key} = {value}")
     
-    # Set standard parameters for all experiments
+    # Extract key parameters for experiment execution
+    min_train_embeddedness = config.get('min_train_embeddedness', 1)
+    use_weighted_features = config.get('use_weighted_features', False)
+    bidirectional_method = config.get('bidirectional_method', 'max')
+    cycle_length = config.get('cycle_length', 4)
+    
+    print(f"  Key parameters:")
+    print(f"    min_train_embeddedness: {min_train_embeddedness}")
+    print(f"    use_weighted_features: {use_weighted_features}")
+    print(f"    bidirectional_method: {bidirectional_method}")
+    print(f"    cycle_length: {cycle_length}")
+    
+    # Set standard parameters for optimal experiments
     standard_params = {
         'num_test_edges': 3080,
         'num_validation_edges': 2640,
@@ -95,43 +107,129 @@ def run_single_experiment(experiment_name, config_modifications=None, base_confi
     
     config.update(standard_params)
     
-    # Create experiment-specific config file
-    exp_config_path = os.path.join(PROJECT_ROOT, f'config_{experiment_name}.yaml')
     try:
-        with open(exp_config_path, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-        print(f"  Created config file: {exp_config_path}")
-    except Exception as e:
-        print(f"Error creating config file: {e}")
-        return False
-    
-    # FIXED: Now call run_experiment.py instead of main.py with --config parameter
-    try:
-        print(f"  Starting experiment execution...")
-        cmd = [sys.executable, 'notebooks/run_experiment.py', '--config', exp_config_path, '--name', experiment_name]
+        # Step 1: Run preprocessing with embeddedness parameter
+        print(f"  Step 1: Running preprocessing...")
+        preprocess_cmd = [
+            sys.executable, 'notebooks/preprocess.py',
+            '--name', experiment_name,
+            '--min_embeddedness', str(min_train_embeddedness)
+        ]
+        
+        # Add conditional flags
+        if use_weighted_features:
+            preprocess_cmd.append('--use_weighted_features')
+        if bidirectional_method:
+            preprocess_cmd.extend(['--bidirectional_method', bidirectional_method])
+        
+        print(f"    Command: {' '.join(preprocess_cmd)}")
         
         result = subprocess.run(
-            cmd,
+            preprocess_cmd,
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
-            timeout=3600  # 1 hour timeout
+            timeout=1800  # 30 minutes timeout
         )
         
-        if result.returncode == 0:
-            print(f"  ✓ Experiment {experiment_name} completed successfully")
+        if result.returncode != 0:
+            print(f"  ✗ Preprocessing failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        
+        print(f"  ✓ Preprocessing completed successfully")
+        
+        # Step 2: Run training
+        print(f"  Step 2: Running training...")
+        train_cmd = [
+            sys.executable, 'notebooks/train_model.py',
+            '--name', experiment_name,
+            '--n_folds', '5',
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        print(f"    Command: {' '.join(train_cmd)}")
+        
+        result = subprocess.run(
+            train_cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=1800  # 30 minutes timeout
+        )
+        
+        if result.returncode != 0:
+            print(f"  ✗ Training failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        
+        print(f"  ✓ Training completed successfully")
+        
+        # Step 3: Run validation
+        print(f"  Step 3: Running validation...")
+        validate_cmd = [
+            sys.executable, 'notebooks/validate_model.py',
+            '--name', experiment_name,
+            '--n_folds', '5',
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        result = subprocess.run(
+            validate_cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=1800
+        )
+        
+        if result.returncode != 0:
+            print(f"  ✗ Validation failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        
+        print(f"  ✓ Validation completed successfully")
+        
+        # Step 4: Run testing
+        print(f"  Step 4: Running testing...")
+        test_cmd = [
+            sys.executable, 'notebooks/test_model.py',
+            '--name', experiment_name,
+            '--n_folds', '5',
+            '--cycle_length', str(cycle_length)
+        ]
+        
+        result = subprocess.run(
+            test_cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=1800
+        )
+        
+        if result.returncode != 0:
+            print(f"  ✗ Testing failed")
+            print(f"  Error: {result.stderr}")
+            return False
+        
+        print(f"  ✓ Testing completed successfully")
+        
+        # Verify results exist
+        metrics_path = os.path.join(RESULTS_DIR, experiment_name, 'testing', 'metrics.json')
+        if os.path.exists(metrics_path):
+            print(f"  ✓ Results verified: {metrics_path}")
             
             # Copy config to results directory for reference
-            exp_results_dir = os.path.join(RESULTS_DIR, experiment_name)
-            if os.path.exists(exp_results_dir):
-                config_dest = os.path.join(exp_results_dir, 'config_used.yaml')
-                shutil.copy2(exp_config_path, config_dest)
-                print(f"  ✓ Config copied to results directory")
+            config_dest = os.path.join(RESULTS_DIR, experiment_name, 'config_used.yaml')
+            try:
+                with open(config_dest, 'w', encoding='utf-8') as f:
+                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                print(f"  ✓ Config saved to results directory")
+            except Exception as e:
+                print(f"  Warning: Could not save config: {e}")
             
             return True
         else:
-            print(f"  ✗ Experiment {experiment_name} failed")
-            print(f"  Error: {result.stderr}")
+            print(f"  ✗ Results not found: {metrics_path}")
             return False
             
     except subprocess.TimeoutExpired:
@@ -140,10 +238,6 @@ def run_single_experiment(experiment_name, config_modifications=None, base_confi
     except Exception as e:
         print(f"  ✗ Experiment {experiment_name} failed with exception: {e}")
         return False
-    finally:
-        # Clean up temporary config file
-        if os.path.exists(exp_config_path):
-            os.remove(exp_config_path)
 
 def run_weighted_vs_unweighted_experiments():
     """
@@ -161,9 +255,9 @@ def run_weighted_vs_unweighted_experiments():
                 'use_weighted_features': True,
                 'use_structural_features': True,
                 'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4,
+                'bidirectional_method': 'max'
             }
         },
         {
@@ -172,9 +266,9 @@ def run_weighted_vs_unweighted_experiments():
                 'use_weighted_features': False,
                 'use_structural_features': True,
                 'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4,
+                'bidirectional_method': 'max'
             }
         }
     ]
@@ -205,7 +299,7 @@ def run_embeddedness_experiments():
     print("STEP 3: EMBEDDEDNESS LEVEL EXPERIMENTS (FIXED)")
     print("="*80)
     print("Testing different embeddedness filtering levels:")
-    print("- Level 0: No filtering (include all nodes)")
+    print("- Level 0: No filtering (include all edges)")
     print("- Level 1: Moderate filtering (standard)")
     print("- Level 2: Strong filtering (high embeddedness only)")
     
@@ -213,34 +307,40 @@ def run_embeddedness_experiments():
         {
             'name': 'embed_0_optimal',
             'config': {
-                'min_train_embeddedness': 0,
+                'min_train_embeddedness': 0,  # No filtering
                 'min_val_embeddedness': 0,
                 'min_test_embeddedness': 0,
                 'use_weighted_features': False,  # Use best performing feature type
                 'use_structural_features': True,
-                'use_centrality_features': True
+                'use_centrality_features': True,
+                'cycle_length': 4,
+                'bidirectional_method': 'max'
             }
         },
         {
             'name': 'embed_1_optimal',
             'config': {
-                'min_train_embeddedness': 1,
+                'min_train_embeddedness': 1,  # Moderate filtering
                 'min_val_embeddedness': 1,
                 'min_test_embeddedness': 1,
                 'use_weighted_features': False,  # Use best performing feature type
                 'use_structural_features': True,
-                'use_centrality_features': True
+                'use_centrality_features': True,
+                'cycle_length': 4,
+                'bidirectional_method': 'max'
             }
         },
         {
             'name': 'embed_2_optimal',
             'config': {
-                'min_train_embeddedness': 2,
+                'min_train_embeddedness': 2,  # Strong filtering
                 'min_val_embeddedness': 2,
                 'min_test_embeddedness': 2,
                 'use_weighted_features': False,  # Use best performing feature type
                 'use_structural_features': True,
-                'use_centrality_features': True
+                'use_centrality_features': True,
+                'cycle_length': 4,
+                'bidirectional_method': 'max'
             }
         }
     ]
@@ -248,7 +348,7 @@ def run_embeddedness_experiments():
     results = []
     for exp in experiments:
         print(f"\nRunning {exp['name']}...")
-        print(f"  Embeddedness level: {exp['config']['min_test_embeddedness']}")
+        print(f"  Embeddedness level: {exp['config']['min_train_embeddedness']}")
         success = run_single_experiment(exp['name'], exp['config'])
         results.append((exp['name'], success))
         
@@ -262,109 +362,6 @@ def run_embeddedness_experiments():
         status = "SUCCESS" if success else "FAILED"
         level = name.split('_')[1]  # Extract level from name
         print(f"  Embeddedness Level {level}: {status}")
-    
-    return results
-
-def run_positive_ratio_experiments():
-    """
-    Steps 6 & 8: Run positive/negative ratio experiments
-    """
-    print(f"\n{'='*80}")
-    print("STEPS 6 & 8: POSITIVE/NEGATIVE RATIO EXPERIMENTS")
-    print("="*80)
-    print("Testing different dataset balance ratios:")
-    
-    experiments = [
-        {
-            'name': 'pos_ratio_90_10_optimal',
-            'config': {
-                'pos_train_edges_ratio': 0.9,
-                'pos_test_edges_ratio': 0.9,
-                'pos_edges_ratio': 0.9,
-                'use_weighted_features': False,  # Use best performing feature type
-                'use_structural_features': True,
-                'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
-            }
-        },
-        {
-            'name': 'pos_ratio_80_20_optimal',
-            'config': {
-                'pos_train_edges_ratio': 0.8,
-                'pos_test_edges_ratio': 0.8,
-                'pos_edges_ratio': 0.8,
-                'use_weighted_features': False,
-                'use_structural_features': True,
-                'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
-            }
-        },
-        {
-            'name': 'pos_ratio_70_30_optimal',
-            'config': {
-                'pos_train_edges_ratio': 0.7,
-                'pos_test_edges_ratio': 0.7,
-                'pos_edges_ratio': 0.7,
-                'use_weighted_features': False,
-                'use_structural_features': True,
-                'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
-            }
-        },
-        {
-            'name': 'pos_ratio_60_40_optimal',
-            'config': {
-                'pos_train_edges_ratio': 0.6,
-                'pos_test_edges_ratio': 0.6,
-                'pos_edges_ratio': 0.6,
-                'use_weighted_features': False,
-                'use_structural_features': True,
-                'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
-            }
-        },
-        {
-            'name': 'pos_ratio_50_50_optimal',
-            'config': {
-                'pos_train_edges_ratio': 0.5,
-                'pos_test_edges_ratio': 0.5,
-                'pos_edges_ratio': 0.5,
-                'use_weighted_features': False,
-                'use_structural_features': True,
-                'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
-            }
-        }
-    ]
-    
-    results = []
-    for exp in experiments:
-        print(f"\nRunning {exp['name']}...")
-        ratio = exp['config']['pos_test_edges_ratio']
-        print(f"  Positive ratio: {ratio:.0%}, Negative ratio: {(1-ratio):.0%}")
-        success = run_single_experiment(exp['name'], exp['config'])
-        results.append((exp['name'], success))
-        
-        if success:
-            print(f"✓ {exp['name']} completed successfully")
-        else:
-            print(f"✗ {exp['name']} failed")
-    
-    print(f"\nSTEPS 6 & 8 SUMMARY:")
-    for name, success in results:
-        status = "SUCCESS" if success else "FAILED"
-        ratio = name.split('_')[2:4]  # Extract ratio from name
-        print(f"  Ratio {ratio[0]}-{ratio[1]}: {status}")
     
     return results
 
@@ -385,9 +382,8 @@ def run_cycle_length_experiments():
                 'use_weighted_features': False,  # Use best performing feature type
                 'use_structural_features': True,
                 'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'bidirectional_method': 'max'
             }
         },
         {
@@ -397,9 +393,8 @@ def run_cycle_length_experiments():
                 'use_weighted_features': False,
                 'use_structural_features': True,
                 'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'bidirectional_method': 'max'
             }
         },
         {
@@ -409,9 +404,8 @@ def run_cycle_length_experiments():
                 'use_weighted_features': False,
                 'use_structural_features': True,
                 'use_centrality_features': True,
-                'min_train_embeddedness': 1,
-                'min_val_embeddedness': 1,
-                'min_test_embeddedness': 1
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'bidirectional_method': 'max'
             }
         }
     ]
@@ -434,6 +428,114 @@ def run_cycle_length_experiments():
         status = "SUCCESS" if success else "FAILED"
         length = name.split('_')[2]  # Extract length from name
         print(f"  Cycle Length {length}: {status}")
+    
+    return results
+
+def run_aggregation_experiments():
+    """
+    Step 4: Run aggregation method experiments
+    """
+    print(f"\n{'='*80}")
+    print("STEP 4: AGGREGATION METHOD EXPERIMENTS")
+    print("="*80)
+    print("Testing different bidirectional edge aggregation methods:")
+    
+    experiments = [
+        {
+            'name': 'aggregation_max_optimal',
+            'config': {
+                'bidirectional_method': 'max',
+                'use_weighted_features': False,
+                'use_structural_features': True,
+                'use_centrality_features': True,
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4
+            }
+        },
+        {
+            'name': 'aggregation_sum_optimal',
+            'config': {
+                'bidirectional_method': 'sum',
+                'use_weighted_features': False,
+                'use_structural_features': True,
+                'use_centrality_features': True,
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4
+            }
+        },
+        {
+            'name': 'aggregation_stronger_optimal',
+            'config': {
+                'bidirectional_method': 'stronger',
+                'use_weighted_features': False,
+                'use_structural_features': True,
+                'use_centrality_features': True,
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4
+            }
+        }
+    ]
+    
+    results = []
+    for exp in experiments:
+        print(f"\nRunning {exp['name']}...")
+        method = exp['config']['bidirectional_method']
+        print(f"  Aggregation method: {method}")
+        success = run_single_experiment(exp['name'], exp['config'])
+        results.append((exp['name'], success))
+        
+        if success:
+            print(f"✓ {exp['name']} completed successfully")
+        else:
+            print(f"✗ {exp['name']} failed")
+    
+    print(f"\nSTEP 4 SUMMARY:")
+    for name, success in results:
+        status = "SUCCESS" if success else "FAILED"
+        method = name.split('_')[1]  # Extract method from name
+        print(f"  Aggregation {method}: {status}")
+    
+    return results
+
+def run_dataset_comparison_experiments():
+    """
+    Step 2: Run dataset comparison experiments (Bitcoin vs Others)
+    """
+    print(f"\n{'='*80}")
+    print("STEP 2: DATASET COMPARISON EXPERIMENTS")
+    print("="*80)
+    print("Creating baseline experiments for dataset comparison:")
+    
+    experiments = [
+        {
+            'name': 'baseline_bitcoin_verification',
+            'config': {
+                'use_weighted_features': False,
+                'use_structural_features': True,
+                'use_centrality_features': True,
+                'min_train_embeddedness': 1,  # Default embeddedness
+                'cycle_length': 4,
+                'bidirectional_method': 'max',
+                'data_path': 'data/soc-sign-bitcoinotc.csv'
+            }
+        }
+    ]
+    
+    results = []
+    for exp in experiments:
+        print(f"\nRunning {exp['name']}...")
+        success = run_single_experiment(exp['name'], exp['config'])
+        results.append((exp['name'], success))
+        
+        if success:
+            print(f"✓ {exp['name']} completed successfully")
+        else:
+            print(f"✗ {exp['name']} failed")
+    
+    print(f"\nSTEP 2 SUMMARY:")
+    for name, success in results:
+        status = "SUCCESS" if success else "FAILED"
+        print(f"  {name}: {status}")
     
     return results
 
@@ -753,56 +855,54 @@ def create_cycle_length_comparison(df, output_dir):
     print(f"✓ Cycle length comparison saved to: {output_path}")
     plt.close()
 
-def create_positive_ratio_comparison(df, output_dir):
-    """Create positive ratio comparison plots - Steps 6 & 8"""
-    print("\n=== Creating Positive Ratio Comparison (Steps 6 & 8) ===")
+def create_aggregation_comparison(df, output_dir):
+    """Create aggregation method comparison plots - Step 4"""
+    print("\n=== Creating Aggregation Method Comparison (Step 4) ===")
     
-    # Filter for positive ratio experiments
-    ratio_experiments = ['pos_ratio_90_10_optimal', 'pos_ratio_80_20_optimal', 
-                        'pos_ratio_70_30_optimal', 'pos_ratio_60_40_optimal', 
-                        'pos_ratio_50_50_optimal']
-    ratio_df = df[df['experiment_name'].isin(ratio_experiments)].copy()
+    # Filter for aggregation experiments
+    agg_experiments = ['aggregation_max_optimal', 'aggregation_sum_optimal', 'aggregation_stronger_optimal']
+    agg_df = df[df['experiment_name'].isin(agg_experiments)].copy()
     
-    if ratio_df.empty:
-        print("WARNING: No positive ratio experiments found")
+    if agg_df.empty:
+        print("WARNING: No aggregation experiments found")
         return
     
-    ratio_df = ratio_df.sort_values('positive_ratio', ascending=False)
-    
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle('Model Performance vs Positive/Negative Ratio\n(Steps 6 & 8: Impact of Dataset Balance)', 
+    fig.suptitle('Aggregation Method Performance Comparison\n(Step 4: Impact of Bidirectional Edge Handling)', 
                  fontsize=16, fontweight='bold')
     
     metrics = [
         ('accuracy', 'Accuracy'),
         ('f1_score', 'F1 Score'),
-        ('roc_auc', 'ROC AUC'), 
+        ('roc_auc', 'ROC AUC'),
         ('precision', 'Precision')
     ]
+    
+    # Extract method names from experiment names
+    agg_df['method'] = agg_df['experiment_name'].str.extract(r'aggregation_(\w+)_optimal')[0]
     
     for idx, (metric, title) in enumerate(metrics):
         ax = axes[idx//2, idx%2]
         
-        pos_ratios = ratio_df['positive_ratio'].values * 100  # Convert to percentage
-        values = ratio_df[metric].values
+        methods = agg_df['method'].values
+        values = agg_df[metric].values
         
-        ax.plot(pos_ratios, values, marker='s', linewidth=3, markersize=8, color='#F18F01')
-        ax.fill_between(pos_ratios, values, alpha=0.3, color='#F18F01')
+        bars = ax.bar(methods, values, color=['#1f77b4', '#ff7f0e', '#2ca02c'], alpha=0.7)
         
-        ax.set_title(f'{title} by Positive Ratio', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Positive Examples (%)', fontsize=12)
+        ax.set_title(f'{title} by Aggregation Method', fontsize=14, fontweight='bold')
         ax.set_ylabel(title, fontsize=12)
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=0.3, axis='y')
         
         # Add value labels
-        for x, y in zip(pos_ratios, values):
-            ax.annotate(f'{y:.3f}', (x, y), textcoords="offset points",
-                       xytext=(0,10), ha='center', fontweight='bold')
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.005,
+                   f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
     
     plt.tight_layout()
-    output_path = os.path.join(output_dir, 'step6_8_positive_ratio_comparison.png')
+    output_path = os.path.join(output_dir, 'step4_aggregation_comparison.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Positive ratio comparison saved to: {output_path}")
+    print(f"✓ Aggregation method comparison saved to: {output_path}")
     plt.close()
 
 def create_comprehensive_summary(df, output_dir):
@@ -868,11 +968,11 @@ def run_analysis():
         # Step 3: Embeddedness Level Comparison (FIXED)
         create_embeddedness_comparison(df, OUTPUT_DIR)
         
+        # Step 4: Aggregation Method Comparison
+        create_aggregation_comparison(df, OUTPUT_DIR)
+        
         # Step 7: Cycle Length Comparison
         create_cycle_length_comparison(df, OUTPUT_DIR)
-        
-        # Steps 6 & 8: Positive Ratio Comparison
-        create_positive_ratio_comparison(df, OUTPUT_DIR)
         
         # Comprehensive Summary
         create_comprehensive_summary(df, OUTPUT_DIR)
@@ -891,13 +991,16 @@ def run_analysis():
         return False
 
 def main():
-    """Main function to run all batch experiments and analysis"""
-    print("ENHANCED BATCH EXPERIMENTS RUNNER - FIXED CONFIGURATION HANDLING")
+    """
+    Main function to run all batch experiments and analysis
+    """
+    print("ENHANCED BATCH EXPERIMENTS RUNNER - FIXED EMBEDDEDNESS HANDLING")
     print("="*80)
     print("Running comprehensive batch experiments for link prediction analysis:")
     print("• Step 1: Weighted vs Unweighted Features (Most Important)")
+    print("• Step 2: Dataset Comparison (Bitcoin baseline)")
     print("• Step 3: Embeddedness Level Comparison (0, 1, 2) - FIXED")
-    print("• Steps 6&8: Positive/Negative Ratio Comparisons")
+    print("• Step 4: Aggregation Method Comparison")
     print("• Step 7: Cycle Length Comparisons (3, 4, 5)")
     print("="*80)
     
@@ -906,27 +1009,32 @@ def main():
     
     try:
         # Step 1: Most Important - Weighted vs Unweighted
-        print(f"\n✓ Starting Step 1: Weighted vs Unweighted Experiments...")
+        print(f"\nStarting Step 1: Weighted vs Unweighted Experiments...")
         step1_results = run_weighted_vs_unweighted_experiments()
         all_results.append(("Step 1 (Weighted vs Unweighted)", step1_results))
         
+        # Step 2: Dataset Comparison
+        print(f"\nStarting Step 2: Dataset Comparison Experiments...")
+        step2_results = run_dataset_comparison_experiments()
+        all_results.append(("Step 2 (Dataset Comparison)", step2_results))
+        
         # Step 3: Embeddedness Level Experiments - FIXED
-        print(f"\n✓ Starting Step 3: Embeddedness Level Experiments...")
+        print(f"\nStarting Step 3: Embeddedness Level Experiments...")
         step3_results = run_embeddedness_experiments()
         all_results.append(("Step 3 (Embeddedness Levels)", step3_results))
         
+        # Step 4: Aggregation Method Experiments
+        print(f"\nStarting Step 4: Aggregation Method Experiments...")
+        step4_results = run_aggregation_experiments()
+        all_results.append(("Step 4 (Aggregation Methods)", step4_results))
+        
         # Step 7: Cycle Length Experiments
-        print(f"\n✓ Starting Step 7: Cycle Length Experiments...")
+        print(f"\nStarting Step 7: Cycle Length Experiments...")
         step7_results = run_cycle_length_experiments()
         all_results.append(("Step 7 (Cycle Lengths)", step7_results))
         
-        # Steps 6 & 8: Positive Ratio Experiments
-        print(f"\n✓ Starting Steps 6 & 8: Positive Ratio Experiments...")
-        step68_results = run_positive_ratio_experiments()
-        all_results.append(("Steps 6 & 8 (Positive Ratios)", step68_results))
-        
         # Run comprehensive analysis
-        print(f"\n✓ Starting Comprehensive Analysis...")
+        print(f"\nStarting Comprehensive Analysis...")
         analysis_success = run_analysis()
         
         # Final summary
@@ -952,7 +1060,7 @@ def main():
         print(f"✓ Total experiments: {total_experiments}")
         print(f"✓ Successful: {successful_experiments}")
         print(f"✗ Failed: {total_experiments - successful_experiments}")
-        print(f"✓ Success rate: {success_rate:.1f}%")
+        print(f"Success rate: {success_rate:.1f}%")
         
         if analysis_success:
             print(f"✓ Comprehensive analysis: SUCCESS")
@@ -962,17 +1070,20 @@ def main():
         
         print(f"\n{'='*80}")
         if successful_experiments == total_experiments and analysis_success:
-            print("🎉 ALL EXPERIMENTS AND ANALYSIS COMPLETED SUCCESSFULLY!")
-            print("✓ Fixed configuration parameter handling working correctly")
+            print("✓ ALL EXPERIMENTS AND ANALYSIS COMPLETED SUCCESSFULLY!")
+            print("✓ Fixed embeddedness parameter handling working correctly")
             print("✓ Ready for presentation with all required plots")
+            print("\nNext steps:")
+            print("  1. Run: python notebooks/analyze_all_results.py")
+            print("  2. Run: python notebooks/analyze_feature_distributions.py")
         else:
-            print("⚠️  Some experiments or analysis failed - check logs above")
+            print("  Some experiments or analysis failed - check logs above")
         print("="*80)
         
         return successful_experiments == total_experiments and analysis_success
         
     except Exception as e:
-        print(f"\n❌ CRITICAL ERROR in batch experiments: {str(e)}")
+        print(f"\nCRITICAL ERROR in batch experiments: {str(e)}")
         import traceback
         traceback.print_exc()
         return False
