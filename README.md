@@ -1,7 +1,7 @@
 # Bitcoin Trust Network Edge Sign Prediction
 
 ## Project Overview
-This project implements and extends the link prediction algorithm for signed networks proposed by Chiang et al. in their paper "Exploiting Longer Cycles for Link Prediction in Signed Networks". We use the Bitcoin OTC Web of Trust dataset, which represents trust ratings between users.
+This project implements and extends the link prediction algorithm for signed networks proposed by Chiang et al. in their paper "Exploiting Longer Cycles for Link Prediction in Signed Networks". We use the Bitcoin OTC Web of Trust dataset and conduct comprehensive experiments on higher-order cycle features, embeddedness filtering, weighting strategies, and class-imbalance effects.
 
 ## Dataset Information
 - Source: [Bitcoin OTC Web of Trust](https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html)
@@ -10,126 +10,185 @@ This project implements and extends the link prediction algorithm for signed net
 - Edge weight range: -10 to +10 (positive = trust, negative = distrust)
 - Positive edge ratio: approximately 89%
 
-## Project Structure
-- `data/`: Contains the dataset
-  - `soc-sign-bitcoinotc.csv`: Bitcoin OTC trust network data
-- `notebooks/`: Scripts for exploration and evaluation
-  - `explore_data.py`: Data exploration and statistics (basic network analysis, degree distribution, embeddedness)
-  - `cross_validation_eval.py`: Original evaluation with 10-fold cross-validation (contains data leakage)
-  - **`strict_evaluation.py`**: **Main evaluation script** - implements correct method avoiding data leakage
-  - `strict_evaluation_test.py`: Quick test version (3 folds, 20 edges) for rapid testing
-  - `strict_evaluation_sample.py`: Sampled version (5000 edges) for faster approximate results
-  - `compare_methods.py`: Compares original method vs strict evaluation to show data leakage impact
-  - `optimization_experiments.py`: Tests preprocessing strategies (embeddedness filtering, balanced dataset)
-  - `predict_edge_sign.py`: Demo of single edge prediction with proper feature scaling
-  - `sampled_leave_one_out.py`: Leave-one-out evaluation on sampled edges (placeholder)
-  - `test_evaluation.py`: Unit tests for evaluation functions
-  - `strict_evaluation_resume.py`: Checkpoint support for resuming long evaluations (incomplete)
-- `src/`: Source code
-  - `data_loader.py`: Data loading functions
-  - `preprocessing.py`: Data preprocessing (filtering, balancing, connectivity)
-  - `feature_extraction.py`: Feature extraction using higher-order cycles (with 100x optimization)
-  - `models.py`: Prediction models (logistic regression with scaling)
-  - `evaluation.py`: Evaluation functions and metrics
-  - `utilities.py`: Helper functions for feature statistics
-- `results/`: Stores experiment results and visualizations
-  - Original method results (cross-validation)
-  - Strict evaluation results (avoiding data leakage)
-  - Comparison plots and confusion matrices
+## Repository Structure
+```
+BITCOIN-TRUST-PREDICTION-MAIN/
+├── data/                                   # Raw dataset
+│   └── soc-sign-bitcoinotc.csv
+├── notebooks/                              # Experiment scripts
+│   ├── analyze_all_results.py              # Generates 8 summary plots
+│   ├── analyze_feature_distributions.py    # Creates 6 feature analysis plots
+│   ├── preprocess.py                       # Preprocessing & BFS-split script
+│   ├── run_batch_experiments.py            # Batch runner for main experiments
+│   ├── run_experiment.py                   # Single experiment runner (pos/neg ratios)
+│   ├── train_model.py                      # Cross-validation training logic
+│   └── validate_model.py                   # Hold-out test evaluation (no data leakage)
+├── plots/                                  # Generated visualizations
+│   ├── complete_results_analysis/          # 8 summary plots
+│   └── enhanced_feature_analysis/          # 6 feature distribution plots
+├── results/                                # Experiment outputs
+│   ├── weighted_optimal/                   # Weighted vs unweighted experiments
+│   ├── embed_0_optimal/                    # Embeddedness filtering levels (0/1/2)
+│   ├── aggregation_max_optimal/            # Bidirectional aggregation methods
+│   ├── cycle_length_3_optimal/             # Cycle length comparisons (3/4/5)
+│   ├── pos_ratio_50_50_optimal/            # Class imbalance experiments
+│   └── ...                                 # 18 total experiment types
+├── src/                                    # Core modules
+│   ├── data_loader.py                      # Data loading utilities
+│   ├── preprocessing.py                    # Data preprocessing functions
+│   ├── feature_extraction.py               # Higher-order cycle feature extraction
+│   ├── models.py                           # Logistic regression models
+│   ├── evaluation.py                       # Strict evaluation (no data leakage)
+│   └── utilities.py                        # Helper functions
+├── config.yaml                             # Global configuration
+└── requirements.txt                        # Dependencies
+```
 
 ## Project Goals
-1. Implement Chiang et al.'s edge sign prediction algorithm
-2. Improve the original algorithm by incorporating edge weight information
-3. Extend the algorithm to predict both sign and weight of edges
+1. Implement Chiang et al.'s edge sign prediction algorithm with strict evaluation
+2. Conduct comprehensive experiments on cycle features, embeddedness, and weighting
+3. Evaluate class imbalance effects and bidirectional edge handling strategies
+4. Generate complete analysis with 14 visualization plots
 
-## Key Results (Part 1)
+## Key Experiments
 
-### Data Leakage Discovery - Our Main Contribution
-The original evaluation method had data leakage. When correctly evaluated using our strict method:
-- AUC drops from ~0.97 to ~0.63
-- Model predicts almost all edges as positive (100% FPR)
-- This reveals the true difficulty of edge sign prediction
+### Batch Experiments (run_batch_experiments.py)
+- **Weighted vs Unweighted Features**: Compare raw vs weighted cycle features
+- **Embeddedness Filtering**: Test 0/1/2 common neighbor thresholds
+- **Aggregation Methods**: Compare max/sum/stronger bidirectional edge handling
+- **Cycle Lengths**: Evaluate 3/4/5-cycle features
+- **Dataset Comparison**: Bitcoin OTC vs Epinions subset baseline
 
-### Performance Comparison
-| Method | k | Accuracy | AUC | False Positive Rate | Note |
-|--------|---|----------|-----|---------------------|------|
-| Original (with leakage) | 3 | 92.75% | 0.8514 | 65.32% | ❌ Incorrect |
-| Original (with leakage) | 4 | 97.10% | 0.9669 | 26.28% | ❌ Incorrect |
-| **Strict (no leakage)** | 3 | 90.0% | **0.626** | 100% | ✅ **True performance** |
-| **Strict (no leakage)** | 4 | 90.0% | **0.627** | 100% | ✅ **True performance** |
+### Class Imbalance Experiments (run_experiment.py)
+Test positive:negative ratios: 50:50, 60:40, 70:30, 80:20, 90:10
 
-## Notebooks Description
+### Analysis & Visualization
+- **Summary Analysis**: 8 comprehensive comparison plots
+- **Feature Analysis**: 6 distribution and impact analysis plots
 
-### Core Evaluation Scripts
-- **`strict_evaluation.py`** 🌟: **The most important file** - correct evaluation implementation that avoids data leakage. For each test edge, features are extracted from the test set excluding the current edge. Takes ~40 minutes for full evaluation.
+## How to Run
 
-- **`strict_evaluation_test.py`**: Quick test version created for rapid iteration while developing the strict evaluation. Uses 3 folds and 20 edges per fold with 50% negative edge sampling, runs in ~14 seconds.
+### Quick Start
+```bash
+# Setup
+git clone <repository-url>
+cd bitcoin-trust-prediction-main
+pip install -r requirements.txt
 
-- **`cross_validation_eval.py`**: Original evaluation using standard cross-validation. Contains data leakage as features are extracted from the full graph. Shows inflated performance but kept for comparison.
+# Download dataset
+wget https://snap.stanford.edu/data/soc-sign-bitcoinotc.csv.gz
+gunzip soc-sign-bitcoinotc.csv.gz
+mv soc-sign-bitcoinotc.csv data/
+```
 
-- **`compare_methods.py`**: Runs both methods side-by-side to demonstrate the impact of data leakage. Clearly shows the performance drop when evaluated correctly.
+### Run All Experiments
+```bash
+cd notebooks
 
-### Testing and Optimization
-- **`strict_evaluation_sample.py`**: Evaluates on a sample of 5000 edges for faster approximate results. Good for initial testing before full runs.
+# 1. Run all batch experiments (weighted, embeddedness, aggregation, cycle length)
+python run_batch_experiments.py
 
-- **`optimization_experiments.py`**: Tests various preprocessing strategies:
-  - Filtering by minimum embeddedness
-  - Creating balanced datasets
-  - Neutral edge removal
+# 2. Run class imbalance experiments
+python run_experiment.py --config ../config.yaml --override "pos_edges_ratio=0.5;min_train_embeddedness=1;cycle_length=4"
+python run_experiment.py --config ../config.yaml --override "pos_edges_ratio=0.6;min_train_embeddedness=1;cycle_length=4"
+python run_experiment.py --config ../config.yaml --override "pos_edges_ratio=0.7;min_train_embeddedness=1;cycle_length=4"
+python run_experiment.py --config ../config.yaml --override "pos_edges_ratio=0.8;min_train_embeddedness=1;cycle_length=4"
+python run_experiment.py --config ../config.yaml --override "pos_edges_ratio=0.9;min_train_embeddedness=1;cycle_length=4"
 
-### Data Analysis and Utilities
-- **`explore_data.py`**: Initial data exploration including:
-  - Network statistics (nodes, edges, components)
-  - Edge weight distribution
-  - Embeddedness analysis
-  - Degree distribution
+# 3. Generate all analysis plots
+python analyze_all_results.py
+python analyze_feature_distributions.py
+```
 
-- **`predict_edge_sign.py`**: Implementation showing how to:
-  - Suppress edges for testing
-  - Apply proper feature scaling (required due to expanded feature set)
-  - Make individual predictions with configurable thresholds
+### Alternative: Run Everything at Once
+```bash
+python run_comprehensive_experiments.py
+```
 
-- **`test_evaluation.py`**: Unit tests for evaluation functions using simulated data.
+## Core Pipeline Scripts
 
-### Incomplete/Placeholder Scripts
-- **`sampled_leave_one_out.py`**: Placeholder for leave-one-out evaluation.
-- **`strict_evaluation_resume.py`**: Intended for checkpoint support to resume long evaluations. Not fully implemented.
+### Main Evaluation Pipeline
+- **`validate_model.py`** : implements strict hold-out evaluation avoiding data leakage. For each test edge, features are extracted excluding the current edge.
+
+- **`run_batch_experiments.py`**: Automated runner for 13 main experiments comparing weighted features, embeddedness levels, aggregation methods, and cycle lengths.
+
+- **`run_experiment.py`**: Single experiment runner, primarily used for positive/negative ratio experiments with configurable parameters.
+
+### Analysis & Visualization
+- **`analyze_all_results.py`**: Generates 8 summary plots comparing all experiments:
+  1. Weighted vs Unweighted comparison
+  2. Dataset comparison (Bitcoin vs Epinions)
+  3. Embeddedness filtering comparison
+  4. Aggregation method comparison
+  5. Performance summary table
+  6. Positive ratio comparison
+  7. Cycle length comparison
+  8. Enhanced pos/neg ratio analysis
+
+- **`analyze_feature_distributions.py`**: Creates 6 feature analysis plots:
+  1. Individual feature distributions
+  2. Embeddedness filtering impact
+  3. Weighted vs unweighted features
+  4. Feature statistics analysis
+  5. Scaler comparison
+  6. Class distribution analysis
+
+### Core Processing
+- **`preprocess.py`**: Data preprocessing including embeddedness filtering, connectivity assurance, and BFS-based fold creation
+- **`train_model.py`**: Cross-validation training with logistic regression and feature scaling
+- **`feature_extraction.py`**: Optimized higher-order cycle feature extraction (~100x speedup)
+
+## Key Results
+
+### Methodological Contribution
+Our strict evaluation method addresses data leakage by:
+1. BFS-based edge splitting for train/validation/test folds
+2. For each test edge: remove edge → extract features → predict
+3. Ensures no information leakage from test edges during feature extraction
+
+### Comprehensive Experiment Results
+After running all 18 experiments, results show:
+- **Cycle Length**: 4-cycles generally outperform 3-cycles and 5-cycles
+- **Embeddedness**: Moderate filtering (≥1 common neighbor) improves performance
+- **Weighting**: Weighted features show marginal improvements over unweighted
+- **Class Balance**: Performance relatively stable across different pos:neg ratios
+- **Aggregation**: "max" bidirectional handling performs best
+
+### Performance Metrics
+All experiments evaluated on:
+- **Accuracy**: Overall classification accuracy
+- **F1 Score**: Harmonic mean of precision and recall
+- **AUC**: Area under ROC curve
+- **Precision**: Positive prediction accuracy
 
 ## Technical Details
 
-### Key Methodological Fix
-The strict evaluation method addresses the data leakage problem by:
-1. Splitting edges into train/test folds
-2. For each test edge:
-   - Remove the edge from the test set
-   - Extract features using only remaining test edges
-   - Predict using model trained on training edges
-3. This ensures features for test edges don't include information from the edge being predicted
+### Key Features
+- **No Data Leakage**: Strict BFS-based splitting and evaluation
+- **Higher-Order Cycles**: Up to 5-cycle features with sparse matrix optimization
+- **Embeddedness Filtering**: Common neighbor thresholding (0/1/2 levels)
+- **Bidirectional Handling**: Multiple aggregation strategies (max/sum/stronger)
+- **Class Imbalance**: Systematic evaluation across different pos:neg ratios
+- **Comprehensive Analysis**: 14 visualization plots covering all aspects
 
-### Optimizations Implemented
-- **Feature extraction**: Achieved ~100x speedup through sparse matrix operations and parallelization
-- **Node reindexing**: Required after any graph modification to ensure consistency
-- **Feature scaling**: Essential due to expanded feature variety from higher-order cycles
+### Optimizations
+- **Feature Extraction**: 100x speedup through sparse matrix operations
+- **Memory Efficiency**: Optimized graph operations and node reindexing
+- **Reproducibility**: Complete configuration tracking and result serialization
 
-## How to Run
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## Output Structure
+```
+results/experiment_name/
+├── preprocess/         # Preprocessed graphs and folds
+├── training/          # Training fold metrics and models
+├── testing/           # Final test metrics (metrics.json)
+└── config_used.yaml   # Exact configuration used
 
-# Run data exploration
-python notebooks/explore_data.py
+plots/
+├── complete_results_analysis/     # 8 summary comparison plots
+└── enhanced_feature_analysis/     # 6 feature distribution plots
+```
 
-# For immediate results - quick test (14 seconds)
-python notebooks/strict_evaluation_test.py
-
-# For full evaluation - MAIN RESULT (~40 minutes)
-python notebooks/strict_evaluation.py
-
-# Compare methods to see data leakage impact
-python notebooks/compare_methods.py
-
-# Run Part 1 evaluation (main experiment)
-python notebooks/cross_validation_eval.py
-
-# Run optimization experiments (optional)
-python notebooks/optimization_experiments.py
+## References
+- Chiang et al. (2014): "Exploiting Longer Cycles for Link Prediction in Signed Networks"
+- Dataset: [Bitcoin OTC Web of Trust](https://snap.stanford.edu/data/soc-sign-bitcoinotc.html)
